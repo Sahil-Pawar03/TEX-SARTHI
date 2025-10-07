@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TexSaarthi - Reports</title>
+  <link rel="stylesheet" href="styles.css">
+    <script src="auth.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">TexSaarthi</div>
+    <nav>
+      <a href="index.html">Dashboard</a>
+      <a href="orders.html">Orders</a>
+      <a href="invoices.html">Invoices</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="deliveries.html">Deliveries</a>
+      <a href="customers.html">Customers</a>
+      <a class="active" href="reports.html">Reports</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <header class="topbar">
+      <h1>Reports & Analytics</h1>
+      <div>
+        <span id="welcome-user" class="hidden" style="margin-right:8px;"></span>
+        <button class="btn" onclick="window.location.href='export-report.html'">Export Report</button>
+        <a id="logout-btn" class="btn hidden" href="login.html">Logout</a>
+      </div>
+    </header>
+
+    <div class="panel">
+      <h2>Sales Report</h2>
+      <p>This is a placeholder page. You can add charts later using any library, but for now it shows a simple message.</p>
+    </div>
+  </main>
+</body>
+</html>
+
+

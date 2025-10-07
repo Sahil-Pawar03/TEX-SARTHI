@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TexSaarthi - Orders</title>
+  <link rel="stylesheet" href="styles.css">
+    <script src="auth.js" defer></script>
+  <style>
+    .actions button { margin-right: 6px; }
+  </style>
+  </head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">TexSaarthi</div>
+    <nav>
+      <a href="index.html">Dashboard</a>
+      <a class="active" href="orders.html">Orders</a>
+      <a href="invoices.html">Invoices</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="deliveries.html">Deliveries</a>
+      <a href="customers.html">Customers</a>
+      <a href="reports.html">Reports</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <header class="topbar">
+      <h1>Orders Management</h1>
+      <div>
+        <span id="welcome-user" class="hidden" style="margin-right:8px;"></span>
+        <a class="btn primary" href="add-order.html">Add New Order</a>
+      </div>
+    </header>
+
+    <div class="panel">
+      <div class="searchbar">
+        <input type="text" placeholder="Search orders by customer or order number...">
+        <select>
+          <option>All Status</option>
+          <option>in progress</option>
+          <option>ready</option>
+          <option>received</option>
+        </select>
+        <button class="btn light">Filter</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Order #</th>
+            <th>Customer</th>
+            <th>Type</th>
+            <th>Fabric</th>
+            <th>Quantity</th>
+            <th>Delivery Date</th>
+            <th>Value</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ORD-001</td>
+            <td>Rajesh Kumar</td>
+            <td>Weaving</td>
+            <td>Cotton</td>
+            <td>50</td>
+            <td>20/01/2024</td>
+            <td>₹25,000</td>
+            <td><span class="status yellow">in progress</span></td>
+            <td class="actions">
+              <button class="btn elevated">View</button>
+              <button class="btn elevated">Edit</button>
+            </td>
+          </tr>
+          <tr>
+            <td>ORD-002</td>
+            <td>Priya Textiles</td>
+            <td>Dyeing</td>
+            <td>Silk</td>
+            <td>30</td>
+            <td>18/01/2024</td>
+            <td>₹45,000</td>
+            <td><span class="status green">ready</span></td>
+            <td class="actions">
+              <button class="btn elevated">View</button>
+              <button class="btn elevated">Edit</button>
+            </td>
+          </tr>
+          <tr>
+            <td>ORD-003</td>
+            <td>Mumbai Fabrics Ltd</td>
+            <td>Tailoring</td>
+            <td>Polyester</td>
+            <td>100</td>
+            <td>25/01/2024</td>
+            <td>₹75,000</td>
+            <td><span class="status blue">received</span></td>
+            <td class="actions">
+              <button class="btn light">View</button>
+              <button class="btn light">Edit</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</body>
+</html>
+
+

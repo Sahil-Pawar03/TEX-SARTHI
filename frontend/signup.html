@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TexSaarthi - Sign Up</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="auth.js" defer></script>
+  <style>
+    .auth-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+    .auth-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; width: 100%; max-width: 420px; padding: 20px; box-shadow: var(--shadow); }
+    .auth-card h1 { margin-top: 0; margin-bottom: 6px; }
+    .auth-card p { margin-top: 0; color: var(--muted); }
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+    label { font-size: 13px; color: #444; }
+    .actions { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+  </style>
+  </head>
+<body>
+  <main class="auth-page">
+    <div class="auth-card">
+      <div class="brand" style="margin-bottom: 8px;">TexSaarthi</div>
+      <h1>Create your account</h1>
+      <p>Sign up to get started</p>
+      <form id="signup-form">
+        <div class="field">
+          <label>Name</label>
+          <input id="name-input" type="text" placeholder="Your name">
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input id="signup-email-input" type="text" placeholder="you@example.com">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input id="signup-password-input" type="password" placeholder="••••••••">
+        </div>
+        <div class="actions">
+          <button class="btn success" type="submit">Create Account</button>
+        </div>
+        <div style="margin-top: 8px; font-size: 13px; color: #555;">
+          Already have an account?
+          <a href="login.html">Sign in</a>
+        </div>
+        <div id="signup-error" class="alert hidden"></div>
+      </form>
+    </div>
+  </main>
+  </body>
+  </html>
+
+

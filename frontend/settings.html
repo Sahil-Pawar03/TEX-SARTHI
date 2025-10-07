@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TexSaarthi - Settings</title>
+  <link rel="stylesheet" href="styles.css">
+    <script src="auth.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">TexSaarthi</div>
+    <nav>
+      <a href="index.html">Dashboard</a>
+      <a href="orders.html">Orders</a>
+      <a href="invoices.html">Invoices</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="deliveries.html">Deliveries</a>
+      <a href="customers.html">Customers</a>
+      <a href="reports.html">Reports</a>
+      <a class="active" href="settings.html">Settings</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <header class="topbar">
+      <h1>Settings & Configuration</h1>
+      <div>
+        <button class="btn success">Save Changes</button>
+        <a id="logout-btn" class="btn danger" href="#">Logout</a>
+      </div>
+    </header>
+
+    <div class="panel">
+      <h2>Business Profile</h2>
+      <div class="grid-2">
+        <div>
+          <label>Business Name</label>
+          <input type="text" placeholder="TexSaarthi">
+        </div>
+        <div>
+          <label>Owner Name</label>
+          <input type="text" placeholder="Owner">
+        </div>
+        <div style="grid-column: 1 / -1;">
+          <label>Business Address</label>
+          <input type="text" placeholder="Address">
+        </div>
+        <div>
+          <label>Phone Number</label>
+          <input type="text" placeholder="+91 0000000000">
+        </div>
+        <div>
+          <label>Email Address</label>
+          <input type="text" placeholder="email@example.com">
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
+
+

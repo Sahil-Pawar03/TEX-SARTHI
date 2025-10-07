@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TexSaarthi - Inventory</title>
+  <link rel="stylesheet" href="styles.css">
+    <script src="auth.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">TexSaarthi</div>
+    <nav>
+      <a href="index.html">Dashboard</a>
+      <a href="orders.html">Orders</a>
+      <a href="invoices.html">Invoices</a>
+      <a class="active" href="inventory.html">Inventory</a>
+      <a href="deliveries.html">Deliveries</a>
+      <a href="customers.html">Customers</a>
+      <a href="reports.html">Reports</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <header class="topbar">
+      <h1>Inventory Management</h1>
+      <div>
+        <span id="welcome-user" class="hidden" style="margin-right:8px;"></span>
+        <button class="btn primary">Add New Item</button>
+      </div>
+    </header>
+
+    <section class="cards">
+      <div class="card purple">
+        <div class="card-title">Total Items</div>
+        <div class="card-value">3</div>
+      </div>
+      <div class="card red">
+        <div class="card-title">Low Stock</div>
+        <div class="card-value">1</div>
+      </div>
+      <div class="card green">
+        <div class="card-title">Total Value</div>
+        <div class="card-value">₹96,500</div>
+      </div>
+      <div class="card blue">
+        <div class="card-title">Categories</div>
+        <div class="card-value">3</div>
+      </div>
+    </section>
+
+      <div class="panel red">
+      <h2>Low Stock Alert</h2>
+      <p><strong>Silk Thread - Golden</strong> • 25 kg remaining</p>
+        <button class="btn elevated">Add Stock</button>
+    </div>
+
+    <div class="panel" style="margin-top:12px;">
+      <div class="searchbar">
+        <input type="text" placeholder="Search inventory by name or type...">
+        <select>
+          <option>All Types</option>
+          <option>Raw Material</option>
+          <option>Finished</option>
+        </select>
+        <button class="btn">Filter</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Item Name</th>
+            <th>Type</th>
+            <th>Color</th>
+            <th>Current Stock</th>
+            <th>Min Stock</th>
+            <th>Cost/Unit</th>
+            <th>Total Value</th>
+            <th>Supplier</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Cotton Fabric</td>
+            <td>Raw Material</td>
+            <td>White</td>
+            <td>150 meters</td>
+            <td>50 meters</td>
+            <td>₹120</td>
+            <td>₹18,000</td>
+            <td>Gujarat Cotton Mills</td>
+            <td><span class="status green">In Stock</span></td>
+            <td>
+              <button class="btn elevated">View</button>
+            </td>
+          </tr>
+          <tr>
+            <td>Silk Thread</td>
+            <td>Thread</td>
+            <td>Golden</td>
+            <td>25 kg</td>
+            <td>40 kg</td>
+            <td>₹300</td>
+            <td>₹7,500</td>
+            <td>Delhi Threads</td>
+            <td><span class="status red">Low</span></td>
+            <td>
+              <button class="btn elevated">View</button>
+            </td>
+          </tr>
+          <tr>
+            <td>Polyester Roll</td>
+            <td>Raw Material</td>
+            <td>Blue</td>
+            <td>100 meters</td>
+            <td>60 meters</td>
+            <td>₹80</td>
+            <td>₹8,000</td>
+            <td>Poly Weave Ltd</td>
+            <td><span class="status green">In Stock</span></td>
+            <td>
+              <button class="btn elevated">View</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</body>
+</html>
+
+

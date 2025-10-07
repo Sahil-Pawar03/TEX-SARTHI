@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TexSaarthi - Customers</title>
+  <link rel="stylesheet" href="styles.css">
+    <script src="auth.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">TexSaarthi</div>
+    <nav>
+      <a href="index.html">Dashboard</a>
+      <a href="orders.html">Orders</a>
+      <a href="invoices.html">Invoices</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="deliveries.html">Deliveries</a>
+      <a class="active" href="customers.html">Customers</a>
+      <a href="reports.html">Reports</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <header class="topbar">
+      <h1>Customer Management</h1>
+      <div>
+        <span id="welcome-user" class="hidden" style="margin-right:8px;"></span>
+        <button class="btn primary">Add Customer</button>
+      </div>
+    </header>
+
+    <section class="cards">
+      <div class="card purple">
+        <div class="card-title">Total Customers</div>
+        <div class="card-value">3</div>
+      </div>
+      <div class="card green">
+        <div class="card-title">Active Customers</div>
+        <div class="card-value">3</div>
+      </div>
+      <div class="card blue">
+        <div class="card-title">Total Revenue</div>
+        <div class="card-value">₹12,95,000</div>
+      </div>
+      <div class="card red">
+        <div class="card-title">Outstanding</div>
+        <div class="card-value">₹1,00,000</div>
+      </div>
+    </section>
+
+    <div class="panel">
+      <div class="searchbar">
+        <input type="text" placeholder="Search customers by name, phone, or email...">
+        <button class="btn">Search</button>
+      </div>
+      <div class="customer-cards">
+        <div class="customer-card">
+          <h3>Rajesh Kumar</h3>
+          <p>+91 9876543210 • rajesh@example.com</p>
+          <p>123 Textile Street, Mumbai</p>
+          <p><strong>Total Orders:</strong> 5 • <strong>Total Spent:</strong> ₹125,000</p>
+          <p><strong>Outstanding:</strong> ₹25,000 • <strong>Last Order:</strong> 15/01/2024</p>
+          <button class="btn elevated">View Orders</button>
+        </div>
+        <div class="customer-card">
+          <h3>Priya Textiles</h3>
+          <p>+91 9876543211 • priya@textiles.com</p>
+          <p>456 Market Road, Pune</p>
+          <p><strong>Total Orders:</strong> 8 • <strong>Total Spent:</strong> ₹320,000</p>
+          <p><strong>Outstanding:</strong> ₹0 • <strong>Last Order:</strong> 18/01/2024</p>
+          <button class="btn elevated">View Orders</button>
+        </div>
+        <div class="customer-card">
+          <h3>Mumbai Fabrics Ltd</h3>
+          <p>+91 9876543212 • info@mumbaifabrics.com</p>
+          <p>789 Industrial Area, Mumbai</p>
+          <p><strong>Total Orders:</strong> 12 • <strong>Total Spent:</strong> ₹850,000</p>
+          <p><strong>Outstanding:</strong> ₹75,000 • <strong>Last Order:</strong> 20/01/2024</p>
+          <button class="btn elevated">View Orders</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
+
+

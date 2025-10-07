@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TexSaarthi - Invoices</title>
+  <link rel="stylesheet" href="styles.css">
+    <script src="auth.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">TexSaarthi</div>
+    <nav>
+      <a href="index.html">Dashboard</a>
+      <a href="orders.html">Orders</a>
+      <a class="active" href="invoices.html">Invoices</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="deliveries.html">Deliveries</a>
+      <a href="customers.html">Customers</a>
+      <a href="reports.html">Reports</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <header class="topbar">
+      <h1>Invoice Management</h1>
+      <div>
+        <span id="welcome-user" class="hidden" style="margin-right:8px;"></span>
+        <button class="btn success">Create Invoice</button>
+      </div>
+    </header>
+
+    <section class="cards">
+      <div class="card green">
+        <div class="card-title">Total Invoices</div>
+        <div class="card-value">3</div>
+      </div>
+      <div class="card blue">
+        <div class="card-title">Paid</div>
+        <div class="card-value">1</div>
+      </div>
+      <div class="card red">
+        <div class="card-title">Unpaid</div>
+        <div class="card-value">1</div>
+      </div>
+      <div class="card orange">
+        <div class="card-title">Partial</div>
+        <div class="card-value">1</div>
+      </div>
+    </section>
+
+    <div class="panel">
+      <div class="searchbar">
+        <input type="text" placeholder="Search invoices by customer name or invoice number...">
+        <select>
+          <option>All Status</option>
+          <option>paid</option>
+          <option>unpaid</option>
+          <option>partial</option>
+        </select>
+        <button class="btn">Filter</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Invoice #</th>
+            <th>Customer</th>
+            <th>Date</th>
+            <th>Due Date</th>
+            <th>Amount</th>
+            <th>Paid</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>INV-001</td>
+            <td>Rajesh Kumar</td>
+            <td>10/01/2024</td>
+            <td>25/01/2024</td>
+            <td>₹25,000</td>
+            <td>₹0</td>
+            <td><span class="status red">unpaid</span></td>
+            <td>
+              <button class="btn elevated">View</button>
+              <button class="btn elevated">Download</button>
+            </td>
+          </tr>
+          <tr>
+            <td>INV-002</td>
+            <td>Priya Textiles</td>
+            <td>08/01/2024</td>
+            <td>23/01/2024</td>
+            <td>₹45,000</td>
+            <td>₹45,000</td>
+            <td><span class="status green">paid</span></td>
+            <td>
+              <button class="btn elevated">View</button>
+              <button class="btn elevated">Download</button>
+            </td>
+          </tr>
+          <tr>
+            <td>INV-003</td>
+            <td>Mumbai Fabrics Ltd</td>
+            <td>12/01/2024</td>
+            <td>27/01/2024</td>
+            <td>₹75,000</td>
+            <td>₹25,000</td>
+            <td><span class="status yellow">partial</span></td>
+            <td>
+              <button class="btn elevated">View</button>
+              <button class="btn elevated">Download</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</body>
+</html>
+
+

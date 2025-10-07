@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TexSaarthi - Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+    <script src="auth.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">TexSaarthi</div>
+    <nav>
+      <a class="active" href="index.html">Dashboard</a>
+      <a href="orders.html">Orders</a>
+      <a href="invoices.html">Invoices</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="deliveries.html">Deliveries</a>
+      <a href="customers.html">Customers</a>
+      <a href="reports.html">Reports</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <header class="topbar">
+      <h1>Textile Management - Dashboard</h1>
+      <div class="topbar-actions">
+        <span id="welcome-user" class="hidden" style="margin-right:8px;"></span>
+        <a class="btn primary" href="add-order.html">Add New Order</a>
+      </div>
+    </header>
+
+    <section class="cards">
+      <div class="card blue">
+        <div class="card-title">Total Orders</div>
+        <div class="card-value">45</div>
+      </div>
+      <div class="card red">
+        <div class="card-title">Low Stock Items</div>
+        <div class="card-value">8</div>
+      </div>
+      <div class="card orange">
+        <div class="card-title">Pending Deliveries</div>
+        <div class="card-value">12</div>
+      </div>
+      <div class="card green">
+        <div class="card-title">Outstanding Amount</div>
+        <div class="card-value">₹125,000</div>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <div class="panel">
+        <h2>Quick Actions</h2>
+        <div class="quick-actions">
+          <a class="btn light" href="add-order.html">Add New Order</a>
+          <a class="btn light" href="invoices.html">Create Invoice</a>
+          <a class="btn light" href="inventory.html">Update Inventory</a>
+          <a class="btn light" href="deliveries.html">Record Delivery</a>
+          <a class="btn light" href="deliveries.html">Cheak deliveries</a>
+          <a class="btn light" href="reports.html">Cheak Reports</a>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Recent Activities</h2>
+        <ul class="list">
+          <li>New order received from Priya Fabrics</li>
+          <li>Payment received for Invoice #INV-001</li>
+          <li>Order #ORD-123 delivered successfully</li>
+          <li>Low stock alert: Cotton fabric below minimum</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <div class="panel">
+        <h2>Today's Tasks</h2>
+        <div class="searchbar" style="margin:8px 0 10px;">
+          <input id="task-input" type="text" placeholder="Add a new task for today...">
+          <button id="add-task-btn" class="btn primary">Add Task</button>
+        </div>
+        <ul id="tasks-list" class="tasks">
+          <li><input type="checkbox"> Complete order #1234</li>
+          <li class="done"><input type="checkbox" checked> Update inventory for silk fabric</li>
+          <li><input type="checkbox"> Send invoice to Rajesh Textiles</li>
+          <li><input type="checkbox"> Prepare delivery for tomorrow</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h2>Notes</h2>
+        <p></p>
+      </div>
+    </section>
+
+  </main>
+  <script>
+    (function(){
+      var input = document.getElementById('task-input');
+      var btn = document.getElementById('add-task-btn');
+      var list = document.getElementById('tasks-list');
+      if (!input || !btn || !list) return;
+      function addTask(){
+        var text = (input.value || '').trim();
+        if (!text) return;
+        var li = document.createElement('li');
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        li.appendChild(cb);
+        li.appendChild(document.createTextNode(' ' + text));
+        list.insertBefore(li, list.firstChild);
+        input.value = '';
+        input.focus();
+      }
+      btn.addEventListener('click', addTask);
+      input.addEventListener('keydown', function(e){ if (e.key === 'Enter') addTask(); });
+      list.addEventListener('change', function(e){
+        var target = e.target;
+        if (target && target.matches('input[type="checkbox"]')) {
+          var li = target.closest('li');
+          if (li) li.classList.toggle('done', target.checked);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
+
+

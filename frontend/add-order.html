@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TexSaarthi - Add Order</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    label { font-size: 13px; color: #444; }
+    textarea { padding: 8px 10px; border: 1px solid #d6d6d6; border-radius: 8px; width: 100%; min-height: 90px; }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">TexSaarthi</div>
+    <nav>
+      <a href="index.html">Dashboard</a>
+      <a class="active" href="orders.html">Orders</a>
+      <a href="invoices.html">Invoices</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="deliveries.html">Deliveries</a>
+      <a href="customers.html">Customers</a>
+      <a href="reports.html">Reports</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <header class="topbar">
+      <h1>Add New Order</h1>
+      <div>
+        <a class="btn" href="orders.html">Cancel</a>
+        <button class="btn success" type="button">Save Order</button>
+        <a class="btn" href="login.html">Login</a>
+        <a class="btn" href="login.html">Logout</a>
+      </div>
+    </header>
+
+    <div class="panel">
+      <h2>Order Details</h2>
+      <div class="form-grid">
+        <div class="field">
+          <label>Order Number</label>
+          <input type="text" placeholder="ORD-004">
+        </div>
+        <div class="field">
+          <label>Customer Name</label>
+          <input type="text" placeholder="Customer name">
+        </div>
+        <div class="field">
+          <label>Order Type</label>
+          <select>
+            <option>Weaving</option>
+            <option>Dyeing</option>
+            <option>Tailoring</option>
+            <option>Finishing</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Fabric</label>
+          <input type="text" placeholder="Cotton / Silk / Polyester">
+        </div>
+        <div class="field">
+          <label>Color</label>
+          <input type="text" placeholder="Blue, Red, ...">
+        </div>
+        <div class="field">
+          <label>Quantity</label>
+          <input type="text" placeholder="e.g., 50">
+        </div>
+        <div class="field">
+          <label>Units</label>
+          <select>
+            <option>Meters</option>
+            <option>Kg</option>
+            <option>Pieces</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Delivery Date</label>
+          <input type="date">
+        </div>
+        <div class="field">
+          <label>Order Value (₹)</label>
+          <input type="text" placeholder="e.g., 25000">
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select>
+            <option>in progress</option>
+            <option>ready</option>
+            <option>received</option>
+          </select>
+        </div>
+        <div class="field" style="grid-column: 1 / -1;">
+          <label>Notes</label>
+          <textarea placeholder="Additional details..."></textarea>
+        </div>
+      </div>
+      <div style="margin-top: 12px; display: flex; gap: 8px;">
+        <button class="btn success" type="button">Save Order</button>
+        <a class="btn" href="orders.html">Back to Orders</a>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
+
+

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TexSaarthi - Login</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="auth.js" defer></script>
+  <style>
+    .auth-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+    .auth-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; width: 100%; max-width: 420px; padding: 20px; box-shadow: var(--shadow); }
+    .auth-card h1 { margin-top: 0; margin-bottom: 6px; }
+    .auth-card p { margin-top: 0; color: var(--muted); }
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+    label { font-size: 13px; color: #444; }
+    .actions { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+  </style>
+</head>
+<body>
+  <main class="auth-page">
+    <div class="auth-card">
+      <div class="brand" style="margin-bottom: 8px;">TexSaarthi</div>
+      <h1>Welcome back</h1>
+      <p>Please sign in to continue</p>
+      <form id="login-form">
+        <div class="field">
+          <label>Email</label>
+          <input id="email-input" type="text" placeholder="you@example.com">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input id="password-input" type="password" placeholder="••••••••">
+        </div>
+        <div class="actions">
+          <button class="btn success" type="submit">Sign In</button>
+        </div>
+        <div style="margin-top: 8px; font-size: 13px; color: #555;">
+          Don't have an account?
+          <a href="signup.html">Sign up</a>
+        </div>
+        <div id="login-error" class="alert hidden"></div>
+      </form>
+    </div>
+  </main>
+</body>
+</html>
+
+
