@@ -33,8 +33,6 @@
       <div>
         <a class="btn" href="orders.html">Cancel</a>
         <button class="btn success" type="button">Save Order</button>
-        <a class="btn" href="login.html">Login</a>
-        <a class="btn" href="login.html">Logout</a>
       </div>
     </header>
 
@@ -100,11 +98,82 @@
         </div>
       </div>
       <div style="margin-top: 12px; display: flex; gap: 8px;">
-        <button class="btn success" type="button">Save Order</button>
+        <button id="save-order-btn" class="btn success" type="button">Save Order</button>
         <a class="btn" href="orders.html">Back to Orders</a>
       </div>
     </div>
+
+    <div class="panel" style="margin-top: 12px;">
+      <h2>Saved Orders (This Session)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Order #</th>
+            <th>Customer</th>
+            <th>Type</th>
+            <th>Fabric</th>
+            <th>Color</th>
+            <th>Qty</th>
+            <th>Units</th>
+            <th>Delivery</th>
+            <th>Value</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="saved-orders-body"></tbody>
+      </table>
+    </div>
   </main>
+  <script>
+    (function(){
+      var $ = function(sel){ return document.querySelector(sel); };
+      var byIdx = function(i){ return document.querySelectorAll('.form-grid .field input, .form-grid .field select, .form-grid .field textarea')[i]; };
+
+      var saveBtn = document.getElementById('save-order-btn');
+      var tbody = document.getElementById('saved-orders-body');
+      if (!saveBtn || !tbody) return;
+
+      function getVal(labelText) {
+        var label = Array.from(document.querySelectorAll('.form-grid label')).find(function(l){ return l.textContent.trim() === labelText; });
+        if (!label) return '';
+        var container = label.parentElement;
+        var input = container.querySelector('input, select, textarea');
+        return input ? input.value : '';
+      }
+
+      function addRow() {
+        var orderNo = getVal('Order Number');
+        var customer = getVal('Customer Name');
+        var type = getVal('Order Type');
+        var fabric = getVal('Fabric');
+        var color = getVal('Color');
+        var qty = getVal('Quantity');
+        var units = getVal('Units');
+        var delivery = getVal('Delivery Date');
+        var value = getVal('Order Value (₹)');
+        var status = getVal('Status');
+
+        if (!orderNo || !customer) return; // basic guard
+
+        // Persist in localStorage for Orders Management page
+        var orders = [];
+        try { orders = JSON.parse(localStorage.getItem('orders_list') || '[]'); } catch(_) {}
+        var newOrder = { orderNo: orderNo, customer: customer, type: type, fabric: fabric, color: color, qty: qty, units: units, delivery: delivery, value: value, status: status };
+        orders.push(newOrder);
+        localStorage.setItem('orders_list', JSON.stringify(orders));
+
+        var tr = document.createElement('tr');
+        [orderNo, customer, type, fabric, color, qty, units, delivery, value, status].forEach(function(text){
+          var td = document.createElement('td');
+          td.textContent = text;
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      }
+
+      saveBtn.addEventListener('click', addRow);
+    })();
+  </script>
 </body>
 </html>
 

@@ -12,14 +12,54 @@ function getUserEmail() {
   return localStorage.getItem("auth_email");
 }
 
-function setSession(token, email) {
+function getUserName() {
+  return localStorage.getItem("auth_name");
+}
+
+// Local demo user store (for static/offline usage)
+function getStoredUsers() {
+  try {
+    var raw = localStorage.getItem("auth_users");
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveStoredUsers(usersByEmail) {
+  try {
+    localStorage.setItem("auth_users", JSON.stringify(usersByEmail || {}));
+  } catch (e) {
+    // ignore
+  }
+}
+
+function upsertLocalUser(name, email, password) {
+  var users = getStoredUsers();
+  var key = (email || "").toLowerCase();
+  if (!key) return;
+  users[key] = { name: name || (key.split("@")[0] || "User"), email: key, password: password || "" };
+  saveStoredUsers(users);
+}
+
+function findLocalUser(email) {
+  var users = getStoredUsers();
+  var key = (email || "").toLowerCase();
+  return users[key] || null;
+}
+
+function setSession(token, email, name) {
   localStorage.setItem("auth_token", token);
   localStorage.setItem("auth_email", email || "");
+  if (name) {
+    localStorage.setItem("auth_name", name);
+  }
 }
 
 function clearSession() {
   localStorage.removeItem("auth_token");
   localStorage.removeItem("auth_email");
+  localStorage.removeItem("auth_name");
 }
 
 function isLoggedIn() {
@@ -34,8 +74,12 @@ function updateTopbarUI() {
   if (isLoggedIn()) {
     if (logoutBtn) logoutBtn.classList.remove("hidden");
     if (welcomeSpan) {
-      var email = getUserEmail();
-      welcomeSpan.textContent = email ? "Welcome, " + email : "Welcome";
+      var name = getUserName();
+      if (!name) {
+        var email = getUserEmail();
+        name = email && email.includes("@") ? email.split("@")[0] : "User";
+      }
+      welcomeSpan.textContent = name ? "Welcome, " + name : "Welcome";
       welcomeSpan.classList.remove("hidden");
     }
   } else {
@@ -108,8 +152,8 @@ async function handleLoginSubmit(e) {
 
   try {
     // Strategy:
-    // 1) If running with http(s) and backend reachable → POST /api/login
-    // 2) If file:// or network fails → demo fallback that stores a fake token
+    // 1) Try backend when on http(s)
+    // 2) On failure or when offline (file://), validate against locally stored users
     var shouldUseDemo = location.protocol === "file:";
 
     if (!shouldUseDemo) {
@@ -118,23 +162,40 @@ async function handleLoginSubmit(e) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email, password: password })
       });
-      if (!res.ok) {
-        throw new Error("Invalid credentials");
+      if (res.ok) {
+        var data = await res.json().catch(function(){ return {}; });
+        var token = data.token || "demo-token";
+        var name = data.name || (email && email.split("@")[0]) || "";
+        // Optionally sync to local store for future offline use
+        upsertLocalUser(name, email, password);
+        setSession(token, email, name);
+        location.href = "index.html";
+        return;
       }
-      var data = await res.json().catch(function(){ return {}; });
-      var token = data.token || "demo-token";
-      setSession(token, email);
+      // If backend rejects, attempt local validation next
+    }
+
+    // Local validation path (offline/demo or backend failure)
+    var localUser = findLocalUser(email);
+    if (!localUser) {
+      showLoginError("Account not found. Please sign up first.");
+      return;
+    }
+    if ((localUser.password || "") !== password) {
+      showLoginError("Invalid credentials");
+      return;
+    }
+    setSession("demo-token", localUser.email, localUser.name);
+    location.href = "index.html";
+  } catch (err) {
+    // Network/CORS failure → attempt local validation
+    var localUserCatch = findLocalUser(email);
+    if (localUserCatch && (localUserCatch.password || "") === password) {
+      setSession("demo-token", localUserCatch.email, localUserCatch.name);
       location.href = "index.html";
       return;
     }
-
-    // Demo fallback when no backend
-    setSession("demo-token", email);
-    location.href = "index.html";
-  } catch (err) {
-    // Network/CORS failure → demo fallback
-    setSession("demo-token", email);
-    location.href = "index.html";
+    showLoginError("Login failed. Please check your credentials and try again.");
   }
 }
 
@@ -176,16 +237,22 @@ async function handleSignupSubmit(e) {
       }
       var data = await res.json().catch(function(){ return {}; });
       var token = data.token || "demo-token";
-      setSession(token, email);
+      var nameFromApi = data.name || name || (email && email.split("@")[0]) || "";
+      // Sync to local store for offline login later
+      upsertLocalUser(nameFromApi, email, password);
+      setSession(token, email, nameFromApi);
       location.href = "index.html";
       return;
     }
 
-    setSession("demo-token", email);
+    // Demo/offline signup → persist locally
+    upsertLocalUser(name, email, password);
+    setSession("demo-token", email, (email && email.split("@")[0]));
     location.href = "index.html";
   } catch (err) {
-    // Network/CORS failure → demo fallback
-    setSession("demo-token", email);
+    // Network/CORS failure → store locally and proceed
+    upsertLocalUser(name, email, password);
+    setSession("demo-token", email, (email && email.split("@")[0]));
     location.href = "index.html";
   }
 }

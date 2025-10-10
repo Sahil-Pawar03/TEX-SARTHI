@@ -59,7 +59,7 @@
             <th>Actions</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="orders-body">
           <tr>
             <td>ORD-001</td>
             <td>Rajesh Kumar</td>
@@ -106,6 +106,52 @@
       </table>
     </div>
   </main>
+  <script>
+    (function(){
+      var body = document.getElementById('orders-body');
+      if (!body) return;
+      var stored = [];
+      try { stored = JSON.parse(localStorage.getItem('orders_list') || '[]'); } catch(_) {}
+      if (!Array.isArray(stored) || stored.length === 0) return;
+      function statusClass(s){
+        var v = String(s || '').toLowerCase().trim();
+        if (v === 'ready' || v === 'completed') return 'green';
+        if (v === 'received') return 'blue';
+        if (v.indexOf('progress') !== -1) return 'yellow';
+        return 'red';
+      }
+      stored.forEach(function(o){
+        var tr = document.createElement('tr');
+        // Map exactly to the table columns (no Color/Units here)
+        var cells = [
+          o.orderNo || '',
+          o.customer || '',
+          o.type || '',
+          o.fabric || '',
+          o.qty || '',
+          o.delivery || '',
+          o.value || '',
+        ];
+        cells.forEach(function(text){
+          var td = document.createElement('td');
+          td.textContent = text;
+          tr.appendChild(td);
+        });
+        var statusTd = document.createElement('td');
+        var span = document.createElement('span');
+        span.className = 'status ' + statusClass(o.status);
+        span.textContent = (o.status || '').toString();
+        statusTd.appendChild(span);
+        tr.appendChild(statusTd);
+
+        var actions = document.createElement('td');
+        actions.className = 'actions';
+        actions.innerHTML = '<button class="btn elevated">View</button> <button class="btn elevated">Edit</button>';
+        tr.appendChild(actions);
+        body.appendChild(tr);
+      });
+    })();
+  </script>
 </body>
 </html>
 
