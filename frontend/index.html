@@ -6,6 +6,7 @@
   <title>TexSaarthi - Dashboard</title>
   <link rel="stylesheet" href="styles.css">
     <script src="auth.js" defer></script>
+    <script src="api.js" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -28,25 +29,26 @@
       <div class="topbar-actions">
         <span id="welcome-user" class="hidden" style="margin-right:8px;"></span>
         <a class="btn primary" href="add-order.html">Add New Order</a>
+        <button id="logout-btn" class="btn secondary hidden" style="margin-left:8px;">Logout</button>
       </div>
     </header>
 
     <section class="cards">
       <div class="card blue">
         <div class="card-title">Total Orders</div>
-        <div class="card-value">45</div>
+        <div class="card-value" id="total-orders">Loading...</div>
       </div>
       <div class="card red">
         <div class="card-title">Low Stock Items</div>
-        <div class="card-value">8</div>
+        <div class="card-value" id="low-stock-items">Loading...</div>
       </div>
       <div class="card orange">
         <div class="card-title">Pending Deliveries</div>
-        <div class="card-value">12</div>
+        <div class="card-value" id="pending-deliveries">Loading...</div>
       </div>
       <div class="card green">
         <div class="card-title">Outstanding Amount</div>
-        <div class="card-value">₹125,000</div>
+        <div class="card-value" id="outstanding-amount">Loading...</div>
       </div>
     </section>
 
@@ -65,11 +67,8 @@
 
       <div class="panel">
         <h2>Recent Activities</h2>
-        <ul class="list">
-          <li>New order received from Priya Fabrics</li>
-          <li>Payment received for Invoice #INV-001</li>
-          <li>Order #ORD-123 delivered successfully</li>
-          <li>Low stock alert: Cotton fabric below minimum</li>
+        <ul class="list" id="recent-activities">
+          <li>Loading recent activities...</li>
         </ul>
       </div>
     </section>
@@ -96,6 +95,47 @@
 
   </main>
   <script>
+    // Dashboard data loading
+    document.addEventListener('DOMContentLoaded', async function() {
+      // Protect page and update UI
+      protectPage();
+      updateTopbarUI();
+      attachLogoutHandler();
+      
+      // Load dashboard data
+      try {
+        const api = new TexSarthiAPI();
+        const stats = await api.getDashboardStats();
+        
+        // Update dashboard cards
+        document.getElementById('total-orders').textContent = stats.totalOrders || 0;
+        document.getElementById('low-stock-items').textContent = stats.lowStockItems || 0;
+        document.getElementById('pending-deliveries').textContent = stats.pendingDeliveries || 0;
+        document.getElementById('outstanding-amount').textContent = `₹${(stats.outstandingAmount || 0).toLocaleString()}`;
+        
+        // Update recent activities
+        const activitiesList = document.getElementById('recent-activities');
+        if (stats.recentActivity && stats.recentActivity.length > 0) {
+          activitiesList.innerHTML = '';
+          stats.recentActivity.slice(0, 5).forEach(activity => {
+            const li = document.createElement('li');
+            li.textContent = `Order ${activity.orderNumber} - ${activity.customerName} (${activity.status})`;
+            activitiesList.appendChild(li);
+          });
+        } else {
+          activitiesList.innerHTML = '<li>No recent activities</li>';
+        }
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+        // Show fallback data or error message
+        document.getElementById('total-orders').textContent = 'Error';
+        document.getElementById('low-stock-items').textContent = 'Error';
+        document.getElementById('pending-deliveries').textContent = 'Error';
+        document.getElementById('outstanding-amount').textContent = 'Error';
+      }
+    });
+
+    // Task management functionality
     (function(){
       var input = document.getElementById('task-input');
       var btn = document.getElementById('add-task-btn');
