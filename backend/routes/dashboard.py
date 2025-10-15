@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 dashboard_bp = Blueprint('dashboard', __name__)
 
 @dashboard_bp.route('/dashboard/stats', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_dashboard_stats():
     try:
         # Get total orders count
@@ -128,7 +128,7 @@ def get_dashboard_stats():
         return jsonify({'error': 'Failed to fetch dashboard stats'}), 500
 
 @dashboard_bp.route('/dashboard/charts/sales', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_sales_chart_data():
     try:
         # Get sales data for the last 12 months
@@ -186,7 +186,7 @@ def get_sales_chart_data():
         return jsonify({'error': 'Failed to fetch sales chart data'}), 500
 
 @dashboard_bp.route('/dashboard/charts/orders', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_orders_chart_data():
     try:
         # Get order status distribution

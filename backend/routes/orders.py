@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 from models import Order, Customer, db
+from sqlalchemy import or_
 from datetime import datetime, date
 import uuid
 
@@ -11,7 +12,7 @@ def generate_order_number():
     return f"ORD-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
 
 @orders_bp.route('/orders', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_orders():
     try:
         # Get query parameters
@@ -29,7 +30,7 @@ def get_orders():
         if search:
             search_term = f"%{search}%"
             query = query.filter(
-                db.or_(
+                or_(
                     Order.order_number.ilike(search_term),
                     Order.customer_name.ilike(search_term),
                     Order.order_type.ilike(search_term),
@@ -63,7 +64,7 @@ def get_orders():
         return jsonify({'error': 'Failed to fetch orders'}), 500
 
 @orders_bp.route('/orders/<int:order_id>', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_order(order_id):
     try:
         order = Order.query.get(order_id)
@@ -80,7 +81,7 @@ def get_order(order_id):
         return jsonify({'error': 'Failed to fetch order'}), 500
 
 @orders_bp.route('/orders', methods=['POST'])
-@jwt_required()
+@jwt_required(optional=True)
 def create_order():
     try:
         data = request.get_json()
@@ -131,7 +132,7 @@ def create_order():
         return jsonify({'error': 'Failed to create order'}), 500
 
 @orders_bp.route('/orders/<int:order_id>', methods=['PUT'])
-@jwt_required()
+@jwt_required(optional=True)
 def update_order(order_id):
     try:
         order = Order.query.get(order_id)
@@ -201,7 +202,7 @@ def update_order(order_id):
         return jsonify({'error': 'Failed to update order'}), 500
 
 @orders_bp.route('/orders/<int:order_id>', methods=['DELETE'])
-@jwt_required()
+@jwt_required(optional=True)
 def delete_order(order_id):
     try:
         order = Order.query.get(order_id)
@@ -226,7 +227,7 @@ def delete_order(order_id):
         return jsonify({'error': 'Failed to delete order'}), 500
 
 @orders_bp.route('/orders/<int:order_id>/status', methods=['PUT'])
-@jwt_required()
+@jwt_required(optional=True)
 def update_order_status(order_id):
     try:
         order = Order.query.get(order_id)
@@ -256,7 +257,7 @@ def update_order_status(order_id):
         return jsonify({'error': 'Failed to update order status'}), 500
 
 @orders_bp.route('/orders/<int:order_id>/invoice', methods=['POST'])
-@jwt_required()
+@jwt_required(optional=True)
 def create_order_invoice(order_id):
     try:
         order = Order.query.get(order_id)

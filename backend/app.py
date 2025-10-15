@@ -36,6 +36,7 @@ from routes.invoices import invoices_bp
 from routes.deliveries import deliveries_bp
 from routes.reports import reports_bp
 from routes.settings import settings_bp
+from routes.ai_invoices import ai_invoices_bp
 
 # Register blueprints
 app.register_blueprint(auth_bp, url_prefix='/api')
@@ -47,6 +48,7 @@ app.register_blueprint(invoices_bp, url_prefix='/api')
 app.register_blueprint(deliveries_bp, url_prefix='/api')
 app.register_blueprint(reports_bp, url_prefix='/api')
 app.register_blueprint(settings_bp, url_prefix='/api')
+app.register_blueprint(ai_invoices_bp, url_prefix='/api')
 
 # Error handlers
 @app.errorhandler(404)

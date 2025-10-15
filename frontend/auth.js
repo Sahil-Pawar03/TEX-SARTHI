@@ -154,10 +154,10 @@ async function handleLoginSubmit(e) {
     // Strategy:
     // 1) Try backend when on http(s)
     // 2) On failure or when offline (file://), validate against locally stored users
-    var shouldUseDemo = location.protocol === "file:";
+    var shouldUseDemo = false; // we have a backend at http://localhost:3000
 
     if (!shouldUseDemo) {
-      var res = await fetch("/api/login", {
+      var res = await fetch("http://localhost:3000/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email, password: password })
@@ -225,9 +225,9 @@ async function handleSignupSubmit(e) {
 
   try {
     // Same strategy as login: real API first, otherwise demo fallback
-    var shouldUseDemo = location.protocol === "file:";
+    var shouldUseDemo = false; // we have a backend at http://localhost:3000
     if (!shouldUseDemo) {
-      var res = await fetch("/api/signup", {
+      var res = await fetch("http://localhost:3000/api/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name, email: email, password: password })

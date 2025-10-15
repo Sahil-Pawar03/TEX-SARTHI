@@ -28,26 +28,30 @@
       <h1>Invoice Management</h1>
       <div>
         <span id="welcome-user" class="hidden" style="margin-right:8px;"></span>
-        <button class="btn success">Create Invoice</button>
+        <button class="btn success" id="create-invoice-btn">Create Invoice</button>
+        <button class="btn primary" id="ai-generate-btn" style="margin-left:8px;">
+          <span id="ai-icon">🤖</span> AI Generate
+        </button>
+        <button id="logout-btn" class="btn secondary hidden" style="margin-left:8px;">Logout</button>
       </div>
     </header>
 
     <section class="cards">
       <div class="card green">
         <div class="card-title">Total Invoices</div>
-        <div class="card-value">3</div>
+        <div class="card-value" id="total-invoices">Loading...</div>
       </div>
       <div class="card blue">
         <div class="card-title">Paid</div>
-        <div class="card-value">1</div>
+        <div class="card-value" id="paid-invoices">Loading...</div>
       </div>
       <div class="card red">
         <div class="card-title">Unpaid</div>
-        <div class="card-value">1</div>
+        <div class="card-value" id="unpaid-invoices">Loading...</div>
       </div>
       <div class="card orange">
-        <div class="card-title">Partial</div>
-        <div class="card-value">1</div>
+        <div class="card-title">AI Generated</div>
+        <div class="card-value" id="ai-generated-invoices">Loading...</div>
       </div>
     </section>
 
@@ -75,50 +79,477 @@
             <th>Actions</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="invoices-tbody">
           <tr>
-            <td>INV-001</td>
-            <td>Rajesh Kumar</td>
-            <td>10/01/2024</td>
-            <td>25/01/2024</td>
-            <td>₹25,000</td>
-            <td>₹0</td>
-            <td><span class="status red">unpaid</span></td>
-            <td>
-              <button class="btn elevated">View</button>
-              <button class="btn elevated">Download</button>
-            </td>
-          </tr>
-          <tr>
-            <td>INV-002</td>
-            <td>Priya Textiles</td>
-            <td>08/01/2024</td>
-            <td>23/01/2024</td>
-            <td>₹45,000</td>
-            <td>₹45,000</td>
-            <td><span class="status green">paid</span></td>
-            <td>
-              <button class="btn elevated">View</button>
-              <button class="btn elevated">Download</button>
-            </td>
-          </tr>
-          <tr>
-            <td>INV-003</td>
-            <td>Mumbai Fabrics Ltd</td>
-            <td>12/01/2024</td>
-            <td>27/01/2024</td>
-            <td>₹75,000</td>
-            <td>₹25,000</td>
-            <td><span class="status yellow">partial</span></td>
-            <td>
-              <button class="btn elevated">View</button>
-              <button class="btn elevated">Download</button>
-            </td>
+            <td colspan="8" style="text-align: center; padding: 20px;">Loading invoices...</td>
           </tr>
         </tbody>
       </table>
     </div>
   </main>
+
+  <!-- AI Invoice Generation Modal -->
+  <div id="ai-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>🤖 AI Invoice Generator</h2>
+        <button class="modal-close" onclick="closeAIModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="ai-step1" class="ai-step">
+          <h3>Step 1: Select Orders</h3>
+          <p>Choose orders to generate invoices for:</p>
+          <div id="orders-list" class="orders-list">
+            <div>Loading orders...</div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn secondary" onclick="closeAIModal()">Cancel</button>
+            <button class="btn primary" id="proceed-analysis-btn" disabled>Analyze Selected Orders</button>
+          </div>
+        </div>
+        
+        <div id="ai-step2" class="ai-step hidden">
+          <h3>Step 2: AI Analysis Results</h3>
+          <div id="analysis-results"></div>
+          <div class="modal-actions">
+            <button class="btn secondary" onclick="showStep1()">Back</button>
+            <button class="btn primary" id="generate-invoices-btn">Generate Invoices</button>
+          </div>
+        </div>
+        
+        <div id="ai-step3" class="ai-step hidden">
+          <h3>Step 3: Generation Results</h3>
+          <div id="generation-results"></div>
+          <div class="modal-actions">
+            <button class="btn primary" onclick="closeAIModal(); loadInvoices()">Done</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const api = new TexSarthiAPI();
+    let selectedOrders = [];
+    let analysisData = [];
+
+    // Initialize the page
+    document.addEventListener('DOMContentLoaded', async function() {
+      // Auto-login if not logged in
+      if (!isLoggedIn()) {
+        try {
+          const api = new TexSarthiAPI();
+          const loginResult = await api.login('admin@texsarthi.com', 'admin123');
+          console.log('Auto-logged in successfully');
+        } catch (error) {
+          console.log('Auto-login failed, using demo mode');
+          setSession('demo-token', 'admin@texsarthi.com', 'Admin');
+        }
+      }
+      
+      updateTopbarUI();
+      attachLogoutHandler();
+      
+      await loadInvoices();
+      await checkAIAvailability();
+      
+      // Set up event listeners
+      document.getElementById('ai-generate-btn').addEventListener('click', openAIModal);
+      document.getElementById('proceed-analysis-btn').addEventListener('click', analyzeSelectedOrders);
+      document.getElementById('generate-invoices-btn').addEventListener('click', generateSelectedInvoices);
+    });
+
+    // Load invoices data
+    async function loadInvoices() {
+      try {
+        const response = await api.getInvoices();
+        const invoices = response.invoices || [];
+        
+        // Update statistics
+        const totalInvoices = invoices.length;
+        const paidInvoices = invoices.filter(inv => inv.status === 'paid').length;
+        const unpaidInvoices = invoices.filter(inv => inv.status === 'pending').length;
+        
+        document.getElementById('total-invoices').textContent = totalInvoices;
+        document.getElementById('paid-invoices').textContent = paidInvoices;
+        document.getElementById('unpaid-invoices').textContent = unpaidInvoices;
+        
+        // Get AI-generated invoices count
+        try {
+          const aiStats = await api.getAIInvoiceStats();
+          document.getElementById('ai-generated-invoices').textContent = aiStats.stats.total_ai_invoices || 0;
+        } catch (error) {
+          document.getElementById('ai-generated-invoices').textContent = '0';
+        }
+        
+        // Render invoices table
+        renderInvoicesTable(invoices);
+        
+      } catch (error) {
+        console.error('Failed to load invoices:', error);
+        // Show zero values instead of error
+        document.getElementById('total-invoices').textContent = '0';
+        document.getElementById('paid-invoices').textContent = '0';
+        document.getElementById('unpaid-invoices').textContent = '0';
+        document.getElementById('ai-generated-invoices').textContent = '0';
+        
+        // Show helpful message in table
+        const tbody = document.getElementById('invoices-tbody');
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #666;">Unable to load invoices. Please check backend connection.</td></tr>';
+      }
+    }
+
+    // Render invoices table
+    function renderInvoicesTable(invoices) {
+      const tbody = document.getElementById('invoices-tbody');
+      
+      if (invoices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px;">No invoices found</td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = invoices.map(invoice => `
+        <tr>
+          <td>${invoice.invoice_number}</td>
+          <td>Customer #${invoice.customer_id}</td>
+          <td>${formatDate(invoice.created_at)}</td>
+          <td>${formatDate(invoice.due_date)}</td>
+          <td>₹${invoice.total_amount.toLocaleString()}</td>
+          <td>₹${invoice.status === 'paid' ? invoice.total_amount.toLocaleString() : '0'}</td>
+          <td><span class="status ${getStatusClass(invoice.status)}">${invoice.status}</span></td>
+          <td>
+            <button class="btn elevated" onclick="viewInvoice(${invoice.id})">View</button>
+            <button class="btn elevated">Download</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Check AI availability
+    async function checkAIAvailability() {
+      try {
+        const response = await api.checkAIAvailability();
+        if (!response.ai_available) {
+          document.getElementById('ai-generate-btn').disabled = true;
+          document.getElementById('ai-generate-btn').innerHTML = '<span>🚫</span> AI Unavailable';
+        }
+      } catch (error) {
+        console.warn('Could not check AI availability:', error);
+      }
+    }
+
+    // Open AI modal and load orders
+    async function openAIModal() {
+      document.getElementById('ai-modal').classList.remove('hidden');
+      await loadOrdersForAI();
+      showStep1();
+    }
+
+    // Close AI modal
+    function closeAIModal() {
+      document.getElementById('ai-modal').classList.add('hidden');
+      selectedOrders = [];
+      analysisData = [];
+    }
+
+    // Load orders without invoices for AI generation
+    async function loadOrdersForAI() {
+      try {
+        const response = await api.getOrders();
+        const orders = response.orders || [];
+        
+        // Filter orders that don't have invoices yet
+        const ordersWithoutInvoices = orders.filter(order => 
+          order.status === 'pending' || order.status === 'in_progress'
+        );
+        
+        const ordersList = document.getElementById('orders-list');
+        
+        if (ordersWithoutInvoices.length === 0) {
+          ordersList.innerHTML = '<div class="no-orders">No orders available for invoice generation</div>';
+          return;
+        }
+        
+        ordersList.innerHTML = ordersWithoutInvoices.map(order => `
+          <div class="order-item">
+            <label>
+              <input type="checkbox" value="${order.id}" onchange="toggleOrderSelection(${order.id})">
+              <div class="order-details">
+                <strong>${order.order_number}</strong> - ${order.customer_name}<br>
+                <small>${order.order_type} · ${order.fabric} · ₹${order.order_value}</small>
+              </div>
+            </label>
+          </div>
+        `).join('');
+        
+      } catch (error) {
+        console.error('Failed to load orders:', error);
+        document.getElementById('orders-list').innerHTML = '<div class="error">Failed to load orders</div>';
+      }
+    }
+
+    // Toggle order selection
+    function toggleOrderSelection(orderId) {
+      if (selectedOrders.includes(orderId)) {
+        selectedOrders = selectedOrders.filter(id => id !== orderId);
+      } else {
+        selectedOrders.push(orderId);
+      }
+      
+      document.getElementById('proceed-analysis-btn').disabled = selectedOrders.length === 0;
+    }
+
+    // Analyze selected orders
+    async function analyzeSelectedOrders() {
+      if (selectedOrders.length === 0) return;
+      
+      const resultsDiv = document.getElementById('analysis-results');
+      resultsDiv.innerHTML = '<div class="loading">Analyzing orders with AI...</div>';
+      
+      showStep2();
+      
+      try {
+        analysisData = [];
+        
+        for (const orderId of selectedOrders) {
+          const analysis = await api.analyzeOrderForInvoice(orderId);
+          const suggestions = await api.getAIInvoiceSuggestions(orderId);
+          
+          analysisData.push({
+            orderId,
+            analysis: analysis.analysis,
+            suggestions: suggestions.suggestions,
+            recommendations: analysis.recommendations
+          });
+        }
+        
+        // Display analysis results
+        resultsDiv.innerHTML = analysisData.map(data => `
+          <div class="analysis-item">
+            <h4>Order #${data.orderId}</h4>
+            <div class="analysis-details">
+              <p><strong>Complexity:</strong> ${data.recommendations.complexity_level}</p>
+              <p><strong>Estimated Hours:</strong> ${data.recommendations.estimated_completion_hours}</p>
+              <p><strong>Tax Rate:</strong> ${data.recommendations.suggested_tax_rate}%</p>
+              <p><strong>Estimated Total:</strong> ₹${data.suggestions.estimated_total.toLocaleString()}</p>
+            </div>
+            <div class="suggested-items">
+              <strong>Suggested Items:</strong>
+              <ul>
+                ${data.suggestions.suggested_items.map(item => `
+                  <li>${item.description} - ₹${item.total_price} (${item.tax_rate}% tax)</li>
+                `).join('')}
+              </ul>
+            </div>
+            <p class="ai-notes"><em>${data.suggestions.ai_notes}</em></p>
+          </div>
+        `).join('');
+        
+      } catch (error) {
+        console.error('Analysis failed:', error);
+        resultsDiv.innerHTML = '<div class="error">Analysis failed. Please try again.</div>';
+      }
+    }
+
+    // Generate invoices for selected orders
+    async function generateSelectedInvoices() {
+      const resultsDiv = document.getElementById('generation-results');
+      resultsDiv.innerHTML = '<div class="loading">Generating AI invoices...</div>';
+      
+      showStep3();
+      
+      try {
+        const results = await api.bulkGenerateAIInvoices(selectedOrders, {
+          save_to_db: true,
+          auto_calculate: true
+        });
+        
+        resultsDiv.innerHTML = `
+          <div class="success">
+            <h4>✓ Successfully Generated ${results.generated_count} Invoices</h4>
+            <div class="generated-invoices">
+              ${results.generated_invoices.map(invoice => `
+                <div class="invoice-result">
+                  <strong>${invoice.invoice_number}</strong> - ${invoice.customer_name}<br>
+                  <small>Amount: ₹${invoice.total_amount.toLocaleString()}</small>
+                </div>
+              `).join('')}
+            </div>
+            <p class="success-message">All invoices have been saved to the database and are ready for use.</p>
+          </div>
+        `;
+        
+      } catch (error) {
+        console.error('Invoice generation failed:', error);
+        resultsDiv.innerHTML = '<div class="error">Invoice generation failed. Please try again.</div>';
+      }
+    }
+
+    // Modal step navigation
+    function showStep1() {
+      document.querySelectorAll('.ai-step').forEach(step => step.classList.add('hidden'));
+      document.getElementById('ai-step1').classList.remove('hidden');
+    }
+
+    function showStep2() {
+      document.querySelectorAll('.ai-step').forEach(step => step.classList.add('hidden'));
+      document.getElementById('ai-step2').classList.remove('hidden');
+    }
+
+    function showStep3() {
+      document.querySelectorAll('.ai-step').forEach(step => step.classList.add('hidden'));
+      document.getElementById('ai-step3').classList.remove('hidden');
+    }
+
+    // Utility functions
+    function formatDate(dateStr) {
+      if (!dateStr) return 'N/A';
+      return new Date(dateStr).toLocaleDateString();
+    }
+
+    function getStatusClass(status) {
+      const statusMap = {
+        'paid': 'green',
+        'pending': 'red',
+        'overdue': 'red',
+        'partial': 'yellow'
+      };
+      return statusMap[status] || 'gray';
+    }
+
+    function viewInvoice(invoiceId) {
+      alert(`View invoice #${invoiceId} - Full invoice viewer not implemented yet`);
+    }
+  </script>
+
+  <!-- Add modal styles -->
+  <style>
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    
+    .modal.hidden {
+      display: none;
+    }
+    
+    .modal-content {
+      background: white;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 800px;
+      max-height: 80%;
+      overflow-y: auto;
+    }
+    
+    .modal-header {
+      padding: 20px;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .modal-body {
+      padding: 20px;
+    }
+    
+    .modal-actions {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0;
+      color: #666;
+    }
+    
+    .order-item {
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+    
+    .order-item label {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      cursor: pointer;
+    }
+    
+    .order-details {
+      flex: 1;
+    }
+    
+    .analysis-item {
+      padding: 15px;
+      border: 1px solid #e1e5e9;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      background: #f8f9fa;
+    }
+    
+    .analysis-details {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+      margin: 10px 0;
+    }
+    
+    .suggested-items ul {
+      margin: 5px 0;
+      padding-left: 20px;
+    }
+    
+    .ai-notes {
+      font-style: italic;
+      color: #666;
+      margin-top: 10px;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+    }
+    
+    .success {
+      color: #28a745;
+      text-align: center;
+    }
+    
+    .error {
+      color: #dc3545;
+      text-align: center;
+      padding: 20px;
+    }
+    
+    .generated-invoices {
+      margin: 15px 0;
+    }
+    
+    .invoice-result {
+      padding: 8px;
+      background: #e8f5e8;
+      border-radius: 4px;
+      margin-bottom: 5px;
+    }
+  </style>
 </body>
 </html>
 

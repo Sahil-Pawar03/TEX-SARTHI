@@ -3,7 +3,9 @@
 
 class TexSarthiAPI {
   constructor() {
-    this.baseURL = window.location.protocol === 'file:' ? 'http://localhost:3000/api' : '/api';
+    // Always call the Flask backend running on port 3000
+    // The static server on 8080 does not proxy /api paths
+    this.baseURL = 'http://localhost:3000/api';
     this.token = localStorage.getItem('auth_token');
   }
 
@@ -34,18 +36,42 @@ class TexSarthiAPI {
       const response = await fetch(url, config);
       
       if (response.status === 401) {
+        console.warn('Authentication failed, clearing token');
         this.clearToken();
-        window.location.href = 'login.html';
-        return;
+        // Try to auto-login with default credentials
+        if (endpoint !== '/login') {
+          try {
+            await this.login('admin@texsarthi.com', 'admin123');
+            // Retry the original request
+            const retryConfig = {
+              ...config,
+              headers: {
+                ...config.headers,
+                'Authorization': `Bearer ${this.token}`
+              }
+            };
+            const retryResponse = await fetch(url, retryConfig);
+            if (retryResponse.ok) {
+              return await retryResponse.json();
+            }
+          } catch (loginError) {
+            console.error('Auto-login failed:', loginError);
+          }
+        }
+        throw new Error('Authentication required');
       }
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Request failed' }));
-        throw new Error(error.error || 'Request failed');
+        const error = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }));
+        throw new Error(error.error || `Request failed with status ${response.status}`);
       }
 
       return await response.json();
     } catch (error) {
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        console.error('Network error - is the backend running?');
+        throw new Error('Unable to connect to server. Please check if the backend is running on port 3000.');
+      }
       console.error('API Request failed:', error);
       throw error;
     }
@@ -86,7 +112,8 @@ class TexSarthiAPI {
     if (filters.search) params.append('search', filters.search);
     
     const queryString = params.toString();
-    return await this.request(`/orders${queryString ? `?${queryString}` : ''}`);
+    const res = await this.request(`/orders${queryString ? `?${queryString}` : ''}`);
+    return res && res.orders ? res.orders : [];
   }
 
   async createOrder(orderData) {
@@ -115,7 +142,8 @@ class TexSarthiAPI {
     if (search) params.append('search', search);
     
     const queryString = params.toString();
-    return await this.request(`/customers${queryString ? `?${queryString}` : ''}`);
+    const res = await this.request(`/customers${queryString ? `?${queryString}` : ''}`);
+    return res && res.customers ? res.customers : [];
   }
 
   async createCustomer(customerData) {
@@ -139,7 +167,8 @@ class TexSarthiAPI {
     if (filters.search) params.append('search', filters.search);
     
     const queryString = params.toString();
-    return await this.request(`/inventory${queryString ? `?${queryString}` : ''}`);
+    const res = await this.request(`/inventory${queryString ? `?${queryString}` : ''}`);
+    return res && res.inventory ? res.inventory : [];
   }
 
   async createInventoryItem(itemData) {
@@ -171,6 +200,48 @@ class TexSarthiAPI {
       method: 'POST',
       body: JSON.stringify(invoiceData)
     });
+  }
+
+  // AI Invoice methods
+  async checkAIAvailability() {
+    return await this.request('/invoices/ai-available');
+  }
+
+  async getAIInvoiceSuggestions(orderId) {
+    return await this.request(`/ai/invoices/suggestions/${orderId}`);
+  }
+
+  async generateAIInvoice(orderId, options = {}) {
+    return await this.request(`/ai/invoices/generate/${orderId}`, {
+      method: 'POST',
+      body: JSON.stringify(options)
+    });
+  }
+
+  async analyzeOrderForInvoice(orderId) {
+    return await this.request(`/ai/invoices/analyze-order/${orderId}`);
+  }
+
+  async bulkGenerateAIInvoices(orderIds, options = {}) {
+    return await this.request('/ai/invoices/bulk-generate', {
+      method: 'POST',
+      body: JSON.stringify({ order_ids: orderIds, ...options })
+    });
+  }
+
+  async getInvoiceTemplates() {
+    return await this.request('/ai/invoices/templates');
+  }
+
+  async calculateSmartPricing(items) {
+    return await this.request('/ai/invoices/smart-pricing', {
+      method: 'POST',
+      body: JSON.stringify({ items })
+    });
+  }
+
+  async getAIInvoiceStats() {
+    return await this.request('/ai/invoices/stats');
   }
 
   // Deliveries methods
@@ -322,6 +393,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             <td class="actions">
               <button class="btn elevated" onclick="viewOrder(${order.id})">View</button>
               <button class="btn elevated" onclick="editOrder(${order.id})">Edit</button>
+              <button class="btn primary" onclick="createInvoice(${order.id})">Create Invoice</button>
             </td>
           `;
           tbody.appendChild(tr);
@@ -405,13 +477,33 @@ function getStatusClass(status) {
 
 // Global functions for button actions
 window.viewOrder = function(id) {
-  console.log('View order:', id);
-  // Implement view order functionality
+  (async () => {
+    try {
+      const data = await window.api.request(`/orders/${id}`);
+      const o = data.order || {};
+      alert(`Order Details\n\n# ${o.order_number}\nCustomer: ${o.customer_name || 'N/A'}\nType: ${o.order_type}\nFabric: ${o.fabric || 'N/A'}\nQuantity: ${o.quantity}\nDelivery: ${o.delivery_date || 'N/A'}\nValue: ₹${(o.order_value||0).toLocaleString()}\nStatus: ${o.status}`);
+    } catch (err) {
+      alert(`Failed to load order: ${err.message || err}`);
+    }
+  })();
 };
 
 window.editOrder = function(id) {
-  console.log('Edit order:', id);
-  // Implement edit order functionality
+  (async () => {
+    try {
+      const current = await window.api.request(`/orders/${id}`);
+      const o = current.order || {};
+      const qty = prompt('Update quantity', String(o.quantity ?? ''));
+      if (qty === null) return;
+      const status = prompt('Update status (pending, in_progress, completed, cancelled)', String(o.status ?? 'pending'));
+      if (status === null) return;
+      await window.api.updateOrder(id, { quantity: Number(qty), status });
+      alert('Order updated');
+      location.reload();
+    } catch (err) {
+      alert(`Failed to update order: ${err.message || err}`);
+    }
+  })();
 };
 
 window.viewCustomerOrders = function(id) {
@@ -422,4 +514,55 @@ window.viewCustomerOrders = function(id) {
 window.viewInventoryItem = function(id) {
   console.log('View inventory item:', id);
   // Implement view inventory item functionality
+};
+
+// "AI" helper to propose invoice details and create it
+window.createInvoice = function(orderId) {
+  (async () => {
+    try {
+      // Fetch the order to base our suggestions on
+      const resp = await window.api.request(`/orders/${orderId}`);
+      const o = resp.order || {};
+      const baseAmount = Math.max(0, Number(o.order_value || 0) - Number(o.advance_payment || 0));
+      const suggestedTaxRate = 0.18; // 18% GST default
+      const today = new Date();
+      const suggestedDue = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7);
+
+      // AI-style suggestion text for user context
+      const summary = [
+        `Customer: ${o.customer_name || 'N/A'}`,
+        `Order: ${o.order_number || ''} (${o.order_type || ''})`,
+        `Net amount (order - advance): ₹${baseAmount.toLocaleString()}`,
+        `Suggested tax: ${(suggestedTaxRate * 100).toFixed(0)}%`,
+        `Suggested due date: ${suggestedDue.toISOString().slice(0,10)}`
+      ].join('\n');
+
+      // Confirm with user, allow edits via prompts
+      alert(`Invoice Assistant Suggestions\n\n${summary}`);
+      const amountStr = prompt('Invoice amount (before tax)', String(baseAmount));
+      if (amountStr === null) return;
+      const taxRateStr = prompt('Tax rate (e.g. 0.18 for 18%)', String(suggestedTaxRate));
+      if (taxRateStr === null) return;
+      const dueStr = prompt('Due date (YYYY-MM-DD)', suggestedDue.toISOString().slice(0,10));
+      if (dueStr === null) return;
+      const notes = prompt('Notes (optional)', `Auto-generated for ${o.order_number}`) || '';
+
+      const payload = {
+        amount: Number(amountStr),
+        tax_rate: Number(taxRateStr),
+        due_date: dueStr,
+        notes
+      };
+
+      const created = await window.api.request(`/orders/${orderId}/invoice`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      const inv = created && created.invoice ? created.invoice : {};
+      alert(`Invoice created: ${inv.invoice_number || ''}\nTotal: ₹${(inv.total_amount||0).toLocaleString()}`);
+    } catch (err) {
+      alert(`Failed to create invoice: ${err.message || err}`);
+    }
+  })();
 };

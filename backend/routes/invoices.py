@@ -4,6 +4,13 @@ from models import Invoice, Order, Customer, db
 from datetime import datetime, date
 import uuid
 
+# Import AI invoice generator for integration
+try:
+    from ai_invoice_generator import generate_ai_invoice, get_invoice_suggestions
+    AI_AVAILABLE = True
+except ImportError:
+    AI_AVAILABLE = False
+
 invoices_bp = Blueprint('invoices', __name__)
 
 def generate_invoice_number():
@@ -187,6 +194,15 @@ def update_invoice(invoice_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': 'Failed to update invoice'}), 500
+
+@invoices_bp.route('/invoices/ai-available', methods=['GET'])
+@jwt_required()
+def check_ai_availability():
+    """Check if AI invoice generation is available"""
+    return jsonify({
+        'ai_available': AI_AVAILABLE,
+        'message': 'AI invoice generation is available' if AI_AVAILABLE else 'AI invoice generation is not available'
+    }), 200
 
 @invoices_bp.route('/invoices/<int:invoice_id>/pay', methods=['PUT'])
 @jwt_required()

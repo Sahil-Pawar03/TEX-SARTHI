@@ -220,6 +220,9 @@ def init_database():
             order = Order(**order_data)
             db.session.add(order)
             orders.append(order)
+
+        # Ensure primary keys are assigned before creating related rows
+        db.session.flush()
         
         # Create sample invoices
         print("Creating sample invoices...")
@@ -265,7 +268,7 @@ def init_database():
                     delivery_address=order.customer.address if order.customer else 'Customer Address',
                     status='delivered' if order.status == 'completed' else 'scheduled',
                     delivery_person='Delivery Person',
-                    tracking_number=f'TRK{order.id:06d}',
+                    tracking_number=f'TRK{(order.id or 0):06d}',
                     notes='Handle with care'
                 )
                 db.session.add(delivery)

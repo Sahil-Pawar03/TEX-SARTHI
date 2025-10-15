@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TEX-SARTHI API Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+    .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    button { margin: 5px; padding: 10px 20px; cursor: pointer; }
+    pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow: auto; }
+  </style>
+  <script src="api.js"></script>
+  <script src="auth.js"></script>
+</head>
+<body>
+  <h1>TEX-SARTHI API Test</h1>
+  
+  <h2>Connection Tests</h2>
+  <button onclick="testBackendHealth()">Test Backend Health</button>
+  <button onclick="testLogin()">Test Login</button>
+  <button onclick="testDashboardStats()">Test Dashboard Stats</button>
+  <button onclick="testInvoices()">Test Invoices</button>
+  <button onclick="testAIFeatures()">Test AI Features</button>
+  
+  <div id="results"></div>
+
+  <script>
+    const results = document.getElementById('results');
+    
+    function addResult(message, type = 'info') {
+      const div = document.createElement('div');
+      div.className = `test-result ${type}`;
+      div.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${message}`;
+      results.appendChild(div);
+      results.scrollTop = results.scrollHeight;
+    }
+    
+    async function testBackendHealth() {
+      try {
+        addResult('Testing backend health...', 'info');
+        const response = await fetch('http://localhost:3000/api/health');
+        const data = await response.json();
+        addResult(`✓ Backend is healthy: ${JSON.stringify(data)}`, 'success');
+      } catch (error) {
+        addResult(`✗ Backend health check failed: ${error.message}`, 'error');
+      }
+    }
+    
+    async function testLogin() {
+      try {
+        addResult('Testing login...', 'info');
+        const api = new TexSarthiAPI();
+        const result = await api.login('admin@texsarthi.com', 'admin123');
+        addResult(`✓ Login successful: ${JSON.stringify(result)}`, 'success');
+      } catch (error) {
+        addResult(`✗ Login failed: ${error.message}`, 'error');
+      }
+    }
+    
+    async function testDashboardStats() {
+      try {
+        addResult('Testing dashboard stats...', 'info');
+        const api = new TexSarthiAPI();
+        
+        // Ensure we're logged in
+        if (!api.token) {
+          await api.login('admin@texsarthi.com', 'admin123');
+        }
+        
+        const stats = await api.getDashboardStats();
+        addResult(`✓ Dashboard stats loaded: <pre>${JSON.stringify(stats, null, 2)}</pre>`, 'success');
+      } catch (error) {
+        addResult(`✗ Dashboard stats failed: ${error.message}`, 'error');
+      }
+    }
+    
+    async function testInvoices() {
+      try {
+        addResult('Testing invoices...', 'info');
+        const api = new TexSarthiAPI();
+        
+        // Ensure we're logged in
+        if (!api.token) {
+          await api.login('admin@texsarthi.com', 'admin123');
+        }
+        
+        const invoices = await api.getInvoices();
+        addResult(`✓ Invoices loaded: ${invoices.invoices?.length || 0} invoices found`, 'success');
+      } catch (error) {
+        addResult(`✗ Invoices failed: ${error.message}`, 'error');
+      }
+    }
+    
+    async function testAIFeatures() {
+      try {
+        addResult('Testing AI features...', 'info');
+        const api = new TexSarthiAPI();
+        
+        // Ensure we're logged in
+        if (!api.token) {
+          await api.login('admin@texsarthi.com', 'admin123');
+        }
+        
+        const aiCheck = await api.checkAIAvailability();
+        addResult(`✓ AI availability: ${JSON.stringify(aiCheck)}`, 'success');
+        
+        const templates = await api.getInvoiceTemplates();
+        addResult(`✓ AI templates loaded: ${Object.keys(templates.templates).length} templates`, 'success');
+        
+      } catch (error) {
+        addResult(`✗ AI features failed: ${error.message}`, 'error');
+      }
+    }
+    
+    // Auto-run basic tests on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      addResult('API Test Page Loaded - Click buttons to test functionality', 'info');
+      testBackendHealth();
+    });
+  </script>
+</body>
+</html>
