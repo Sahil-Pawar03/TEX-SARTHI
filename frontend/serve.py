@@ -31,8 +31,8 @@ class CORSRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def _proxy_to_backend(self, method: str):
-        # Only proxy /api/* to backend
-        if not self.path.startswith('/api'):
+        # Only proxy /api and /api/* to backend, avoid matching /api.js
+        if not (self.path == '/api' or self.path.startswith('/api/')):
             return False
         target_url = f"{BACKEND_URL}{self.path}"
         try:
@@ -74,6 +74,22 @@ class CORSRequestHandler(http.server.SimpleHTTPRequestHandler):
             return True
 
     def do_GET(self):
+        # Explicitly serve api.js if requested (resolve relative to this file regardless of cwd)
+        if self.path == '/api.js':
+            try:
+                import os
+                base_dir = os.path.dirname(__file__)
+                api_js_path = os.path.join(base_dir, 'api.js')
+                with open(api_js_path, 'rb') as f:
+                    data = f.read()
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/javascript')
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            except Exception:
+                # Fall through to default handler
+                pass
         if self._proxy_to_backend('GET'):
             return
         return super().do_GET()

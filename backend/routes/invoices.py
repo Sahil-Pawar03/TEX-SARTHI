@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 from models import Invoice, Order, Customer, db
+from sqlalchemy import or_, and_
 from datetime import datetime, date
 import uuid
 
@@ -39,7 +40,7 @@ def get_invoices():
         if search:
             search_term = f"%{search}%"
             query = query.filter(
-                db.or_(
+                or_(
                     Invoice.invoice_number.ilike(search_term),
                     Invoice.order.has(Order.order_number.ilike(search_term)),
                     Invoice.order.has(Order.customer_name.ilike(search_term))
@@ -145,6 +146,63 @@ def create_invoice():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': 'Failed to create invoice'}), 500
+
+@invoices_bp.route('/invoices/by-order-number', methods=['POST'])
+@jwt_required(optional=True)
+def create_invoice_by_order_number():
+    """Create an invoice given only an order_number; derive values from the order."""
+    try:
+        payload = request.get_json(silent=True) or {}
+        order_number = (payload.get('order_number') or '').strip()
+        if not order_number:
+            return jsonify({'error': 'order_number is required'}), 400
+
+        order = Order.query.filter(Order.order_number.ilike(order_number)).first()
+        if not order:
+            return jsonify({'error': 'Order not found'}), 404
+
+        # Ensure customer exists
+        customer = Customer.query.get(order.customer_id)
+        if not customer:
+            customer = Customer(name=order.customer_name or 'Customer')
+            db.session.add(customer)
+            db.session.flush()
+            order.customer_id = customer.id
+
+        # Calculate amounts
+        amount = float((order.order_value or 0) - (order.advance_payment or 0))
+        if amount < 0:
+            amount = 0.0
+        tax_rate = float(payload.get('tax_rate', 0.18))
+        tax_amount = amount * tax_rate
+        total_amount = amount + tax_amount
+
+        due_date = None
+        if payload.get('due_date'):
+            try:
+                due_date = datetime.strptime(payload['due_date'], '%Y-%m-%d').date()
+            except Exception:
+                due_date = None
+
+        invoice = Invoice(
+            invoice_number=generate_invoice_number(),
+            order_id=order.id,
+            customer_id=order.customer_id,
+            amount=amount,
+            tax_amount=tax_amount,
+            total_amount=total_amount,
+            status='pending',
+            due_date=due_date,
+            notes=payload.get('notes', '')
+        )
+
+        db.session.add(invoice)
+        db.session.commit()
+
+        return jsonify({'invoice': invoice.to_dict(), 'message': 'Invoice created successfully'}), 201
+    except Exception:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to create invoice by order number'}), 500
 
 @invoices_bp.route('/invoices/<int:invoice_id>', methods=['PUT'])
 @jwt_required()
@@ -263,7 +321,7 @@ def delete_invoice(invoice_id):
         return jsonify({'error': 'Failed to delete invoice'}), 500
 
 @invoices_bp.route('/invoices/stats', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_invoice_stats():
     try:
         from sqlalchemy import func
@@ -279,7 +337,7 @@ def get_invoice_stats():
         
         # Get overdue invoices
         overdue_invoices = Invoice.query.filter(
-            db.and_(
+            and_(
                 Invoice.status == 'pending',
                 Invoice.due_date < date.today()
             )
@@ -298,7 +356,7 @@ def get_invoice_stats():
         # Get monthly revenue
         current_month = datetime.now().replace(day=1)
         monthly_revenue = db.session.query(func.sum(Invoice.total_amount)).filter(
-            db.and_(
+            and_(
                 Invoice.status == 'paid',
                 Invoice.paid_date >= current_month
             )

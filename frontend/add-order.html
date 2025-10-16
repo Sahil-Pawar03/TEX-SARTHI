@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TexSaarthi - Add Order</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="auth.js" defer></script>
+  <script src="api.js" defer></script>
   <style>
     .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
     .field { display: flex; flex-direction: column; gap: 6px; }
@@ -141,7 +143,60 @@
         return input ? input.value : '';
       }
 
-      function addRow() {
+      async function saveToBackend(payload){
+        // Prefer api.js, but also support direct HTTP fallback
+        const BASE = 'http://localhost:3000/api';
+
+        async function directRequest(endpoint, options){
+          const res = await fetch(BASE + endpoint, { headers:{'Content-Type':'application/json'}, ...options });
+          if (!res.ok) throw new Error(await res.text());
+          return await res.json();
+        }
+
+        const api = window.api || { 
+          getCustomers: async (q) => {
+            const p = q ? `?search=${encodeURIComponent(q)}` : '';
+            const j = await directRequest(`/customers${p}`);
+            return (j && j.customers) || [];
+          },
+          createCustomer: (data) => directRequest('/customers', { method:'POST', body: JSON.stringify(data) }),
+          createOrder: (data) => directRequest('/orders', { method:'POST', body: JSON.stringify(data) })
+        };
+
+        // 1) Ensure a customer exists — find by name, else create
+        var name = (payload.customer_name || '').trim();
+        var customerId = null;
+        try {
+          var customers = await api.getCustomers(name);
+          if (Array.isArray(customers)){
+            var match = customers.find(function(c){ return String(c.name||'').toLowerCase() === name.toLowerCase(); });
+            if (match) customerId = match.id;
+          }
+          if (!customerId){
+            var created = await api.createCustomer({ name: name });
+            customerId = (created && created.customer && created.customer.id) || created.id;
+          }
+        } catch(_) {}
+        if (!customerId) throw new Error('Unable to resolve customer');
+
+        // 2) Create the order in backend
+        var backendOrderResp = await api.createOrder({
+          customer_id: customerId,
+          customer_name: payload.customer_name,
+          order_type: payload.order_type,
+          fabric: payload.fabric,
+          color: payload.color,
+          quantity: payload.quantity,
+          order_value: payload.order_value,
+          delivery_date: payload.delivery_date,
+          status: payload.status,
+          notes: payload.notes,
+          order_number: payload.order_number
+        });
+        return (backendOrderResp && backendOrderResp.order) || backendOrderResp;
+      }
+
+      async function addRow() {
         var orderNo = getVal('Order Number');
         var customer = getVal('Customer Name');
         var type = getVal('Order Type');
@@ -152,26 +207,80 @@
         var delivery = getVal('Delivery Date');
         var value = getVal('Order Value (₹)');
         var status = getVal('Status');
+        var notes = getVal('Notes');
 
-        if (!orderNo || !customer) return; // basic guard
+        if (!customer) { alert('Please enter Customer Name'); return; }
 
-        // Persist in localStorage for Orders Management page
+        // Normalize fields for backend
+        var payload = {
+          order_number: orderNo,
+          customer_name: customer,
+          order_type: String(type||'').toLowerCase(),
+          fabric: fabric,
+          color: color,
+          quantity: Number((qty||'').toString().replace(/[^0-9.]/g,'')) || 0,
+          delivery_date: delivery || null,
+          order_value: Number((value||'').toString().replace(/[^0-9.]/g,'')) || 0,
+          status: String(status||'pending').toLowerCase().replace(' ', '_'),
+          notes: notes || ''
+        };
+
+        // Try backend first; if it fails, fall back to localStorage
+        var created;
+        try {
+          created = await saveToBackend(payload);
+        } catch (e) {
+          console.warn('Backend save failed, storing locally:', e && e.message ? e.message : e);
+        }
+
+        // Persist in localStorage for Orders Management page (also as fallback)
         var orders = [];
         try { orders = JSON.parse(localStorage.getItem('orders_list') || '[]'); } catch(_) {}
-        var newOrder = { orderNo: orderNo, customer: customer, type: type, fabric: fabric, color: color, qty: qty, units: units, delivery: delivery, value: value, status: status };
-        orders.push(newOrder);
+        var localOrder = {
+          id: (created && created.id) || Date.now(),
+          orderNo: created ? created.order_number : (orderNo || ''),
+          order_number: created ? created.order_number : (orderNo || ''),
+          customer: payload.customer_name,
+          customer_name: payload.customer_name,
+          type: payload.order_type,
+          order_type: payload.order_type,
+          fabric: payload.fabric,
+          color: payload.color,
+          qty: payload.quantity,
+          quantity: payload.quantity,
+          units: units,
+          delivery: payload.delivery_date,
+          delivery_date: payload.delivery_date,
+          value: payload.order_value,
+          order_value: payload.order_value,
+          status: payload.status
+        };
+        orders.push(localOrder);
         localStorage.setItem('orders_list', JSON.stringify(orders));
 
         var tr = document.createElement('tr');
-        [orderNo, customer, type, fabric, color, qty, units, delivery, value, status].forEach(function(text){
+        [localOrder.order_number, localOrder.customer_name, localOrder.order_type, localOrder.fabric, String(localOrder.quantity), (localOrder.delivery_date||''), String(localOrder.order_value), localOrder.status].forEach(function(text){
           var td = document.createElement('td');
           td.textContent = text;
           tr.appendChild(td);
         });
+        // add units column cell
+        var insertUnits = document.createElement('td');
+        insertUnits.textContent = units;
+        // Insert units at proper position (after quantity)
+        if (tr.children.length >= 6) {
+          tr.insertBefore(insertUnits, tr.children[6]);
+        } else {
+          tr.appendChild(insertUnits);
+        }
         tbody.appendChild(tr);
+
+        alert(created ? 'Order saved to database.' : 'Order saved locally (backend unavailable).');
       }
 
-      saveBtn.addEventListener('click', addRow);
+      saveBtn.addEventListener('click', function(){
+        addRow();
+      });
     })();
   </script>
 </body>

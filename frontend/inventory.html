@@ -59,13 +59,21 @@
 
     <div class="panel" style="margin-top:12px;">
       <div class="searchbar">
-        <input type="text" placeholder="Search inventory by name or type...">
-        <select>
-          <option>All Types</option>
-          <option>Raw Material</option>
-          <option>Finished</option>
+        <input id="inv-search" type="text" placeholder="Search inventory by name or type...">
+        <select id="inv-type">
+          <option value="">All Types</option>
+          <option value="fabric">Fabric</option>
+          <option value="thread">Thread</option>
+          <option value="button">Button</option>
+          <option value="zipper">Zipper</option>
+          <option value="accessory">Accessory</option>
+          <option value="raw_material">Raw Material</option>
+          <option value="dye">Dye</option>
+          <option value="chemical">Chemical</option>
+          <option value="equipment">Equipment</option>
+          <option value="other">Other</option>
         </select>
-        <button class="btn">Filter</button>
+        <button id="inv-filter" class="btn">Filter</button>
       </div>
       <table id="inventory-table">
         <colgroup>
@@ -96,12 +104,25 @@
         </thead>
         <tbody>
           <tr>
-            <td colspan="10" style="text-align:center; padding:16px; color:#666;">Loading inventory...</td>
+            <td colspan="10" style="text-align:center; padding:16px; color:#666;">Please add some inventory items to see the list here.</td>
           </tr>
         </tbody>
       </table>
     </div>
   </main>
+  <!-- Simple Stock Viewer Modal (no-backend) -->
+  <div id="stock-modal" class="modal hidden">
+    <div class="modal-content" style="max-width:720px;">
+      <div class="modal-header">
+        <h2>Inventory Item</h2>
+        <button class="modal-close" onclick="closeStockModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="stock-body" style="font-size:14px;"></div>
+      <div class="modal-actions">
+        <button class="btn secondary" onclick="closeStockModal()">Close</button>
+      </div>
+    </div>
+  </div>
   <script>
     // Inject locally saved inventory items with exact column order to match header
     document.addEventListener('DOMContentLoaded', function(){
@@ -111,6 +132,14 @@
       try { local = JSON.parse(localStorage.getItem('local_inventory') || '[]'); } catch(_) { local = []; }
       if (!Array.isArray(local) || local.length === 0) return;
       const toCell = (v) => (v === undefined || v === null || v === '' ? '—' : v);
+        // Fallback getStatusClass when api.js fails to load
+        const getStatusClass = (status) => {
+          const s = String(status || '').toLowerCase().trim();
+          if (s === 'ready' || s === 'completed' || s === 'paid' || s === 'delivered' || s === 'in stock' || s === 'in_stock') return 'green';
+          if (s === 'received' || s === 'partial') return 'blue';
+          if (s.indexOf('progress') !== -1 || s === 'scheduled' || s === 'low_stock') return 'yellow';
+          return 'red';
+        };
       const rows = local.map(item => {
         const unit = item.unit ? ' ' + item.unit : '';
         const total = (item.total_value || (Number(item.current_stock||0) * Number(item.cost_per_unit||0))).toLocaleString();
@@ -130,6 +159,66 @@
       }).join('');
       tbody.insertAdjacentHTML('afterbegin', rows);
     });
+
+    // Client-side filter (no-backend)
+    function filterInventoryRows(){
+      const q = (document.getElementById('inv-search')?.value || '').toLowerCase().trim();
+      const t = (document.getElementById('inv-type')?.value || '').toLowerCase().trim();
+      const tbody = document.querySelector('#inventory-table tbody');
+      if (!tbody) return;
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      rows.forEach(tr => {
+        const cells = tr.querySelectorAll('td');
+        if (cells.length < 10) return; // skip placeholder row
+        const name = (cells[0].textContent || '').toLowerCase();
+        const type = (cells[1].textContent || '').toLowerCase();
+        const textMatch = !q || name.indexOf(q) !== -1 || type.indexOf(q) !== -1;
+        const typeMatch = !t || type === t;
+        tr.style.display = (textMatch && typeMatch) ? '' : 'none';
+      });
+    }
+
+    // Wire search and filter events
+    (function(){
+      const s = document.getElementById('inv-search');
+      const sel = document.getElementById('inv-type');
+      const btn = document.getElementById('inv-filter');
+      if (!s || !sel || !btn) return;
+      let d; s.addEventListener('input', function(){ clearTimeout(d); d = setTimeout(filterInventoryRows, 200); });
+      s.addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); filterInventoryRows(); }});
+      sel.addEventListener('change', filterInventoryRows);
+      btn.addEventListener('click', function(e){ e.preventDefault(); filterInventoryRows(); });
+    })();
+
+    // View item details using localStorage only (no-backend)
+    function closeStockModal(){ document.getElementById('stock-modal').classList.add('hidden'); }
+    function openStockModal(html){
+      document.getElementById('stock-body').innerHTML = html;
+      document.getElementById('stock-modal').classList.remove('hidden');
+    }
+    window.viewInventoryItem = function(id){
+      try {
+        let local = [];
+        try { local = JSON.parse(localStorage.getItem('local_inventory') || '[]'); } catch(_) { local = []; }
+        const item = (local || []).find(x => String(x.id) === String(id));
+        if (!item) { alert('Could not find this item in local inventory.'); return; }
+        const unit = item.unit ? ' ' + item.unit : '';
+        const total = (item.total_value || (Number(item.current_stock||0) * Number(item.cost_per_unit||0))).toLocaleString();
+        const html = `
+          <div class="grid-2">
+            <div><strong>Item Name</strong><div>${item.item_name || '—'}</div></div>
+            <div><strong>Type</strong><div>${item.type || '—'}</div></div>
+            <div><strong>Color</strong><div>${item.color || '—'}</div></div>
+            <div><strong>Supplier</strong><div>${item.supplier || '—'}</div></div>
+            <div><strong>Current Stock</strong><div>${Number(item.current_stock||0).toLocaleString()}${unit}</div></div>
+            <div><strong>Min Stock</strong><div>${Number(item.min_stock||0).toLocaleString()}${unit}</div></div>
+            <div><strong>Cost / Unit</strong><div>₹${Number(item.cost_per_unit||0).toLocaleString()}</div></div>
+            <div><strong>Total Value</strong><div>₹${total}</div></div>
+            <div><strong>Status</strong><div><span class="status ${getStatusClass(item.status)}">${String(item.status||'').replace('_',' ')}</span></div></div>
+          </div>`;
+        openStockModal(html);
+      } catch (e) { alert('Failed to open item: ' + (e.message || e)); }
+    }
   </script>
 </body>
 </html>

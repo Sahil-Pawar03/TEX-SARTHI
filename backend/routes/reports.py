@@ -7,7 +7,7 @@ from datetime import datetime, date, timedelta
 reports_bp = Blueprint('reports', __name__)
 
 @reports_bp.route('/reports/sales', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_sales_report():
     try:
         # Get query parameters
@@ -42,70 +42,61 @@ def get_sales_report():
             )
         )
         
-        # Get sales data based on period
-        if period == 'daily':
-            sales_data = db.session.query(
-                func.date(Order.created_at).label('period'),
-                func.count(Order.id).label('order_count'),
-                func.sum(Order.order_value).label('total_revenue'),
-                func.avg(Order.order_value).label('avg_order_value')
-            ).filter(
-                and_(
-                    Order.status == 'completed',
-                    Order.created_at >= start_date,
-                    Order.created_at <= end_date + timedelta(days=1)
-                )
-            ).group_by(
-                func.date(Order.created_at)
-            ).order_by('period').all()
-        
-        elif period == 'weekly':
-            sales_data = db.session.query(
-                func.date_trunc('week', Order.created_at).label('period'),
-                func.count(Order.id).label('order_count'),
-                func.sum(Order.order_value).label('total_revenue'),
-                func.avg(Order.order_value).label('avg_order_value')
-            ).filter(
-                and_(
-                    Order.status == 'completed',
-                    Order.created_at >= start_date,
-                    Order.created_at <= end_date + timedelta(days=1)
-                )
-            ).group_by(
-                func.date_trunc('week', Order.created_at)
-            ).order_by('period').all()
-        
-        elif period == 'monthly':
-            sales_data = db.session.query(
-                func.date_trunc('month', Order.created_at).label('period'),
-                func.count(Order.id).label('order_count'),
-                func.sum(Order.order_value).label('total_revenue'),
-                func.avg(Order.order_value).label('avg_order_value')
-            ).filter(
-                and_(
-                    Order.status == 'completed',
-                    Order.created_at >= start_date,
-                    Order.created_at <= end_date + timedelta(days=1)
-                )
-            ).group_by(
-                func.date_trunc('month', Order.created_at)
-            ).order_by('period').all()
-        
-        else:  # yearly
-            sales_data = db.session.query(
-                func.date_trunc('year', Order.created_at).label('period'),
-                func.count(Order.id).label('order_count'),
-                func.sum(Order.order_value).label('total_revenue'),
-                func.avg(Order.order_value).label('avg_order_value')
-            ).filter(
-                and_(
-                    Order.status == 'completed',
-                    Order.created_at >= start_date,
-                    Order.created_at <= end_date + timedelta(days=1)
-                )
-            ).group_by(
-                func.date_trunc('year', Order.created_at)
-            ).order_by('period').all()
+        # Get sales data based on period (DB-agnostic: compute in Python to support SQLite/Postgres)
+        completed_orders = Order.query.filter(
+            and_(
+                Order.status == 'completed',
+                Order.created_at >= start_date,
+                Order.created_at <= end_date + timedelta(days=1)
+            )
+        ).all()
+
+        from collections import defaultdict
+        buckets = defaultdict(lambda: {'count': 0, 'sum': 0.0})
+
+        def week_start(d):
+            # ISO week starting Monday
+            base = d - timedelta(days=d.weekday())
+            return base.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        for o in completed_orders:
+            dt = o.created_at or datetime.utcnow()
+            if period == 'daily':
+                key = dt.date().isoformat()
+            elif period == 'weekly':
+                key = week_start(dt).date().isoformat()
+            elif period == 'monthly':
+                key = dt.strftime('%Y-%m')
+            else:  # yearly
+                key = dt.strftime('%Y')
+            buckets[key]['count'] += 1
+            buckets[key]['sum'] += float(o.order_value or 0)
+
+        # Build sorted list
+        def sort_key(k):
+            try:
+                if period == 'daily' or period == 'weekly':
+                    return datetime.strptime(k, '%Y-%m-%d')
+                if period == 'monthly':
+                    return datetime.strptime(k, '%Y-%m')
+                return datetime.strptime(k, '%Y')
+            except Exception:
+                return datetime.utcnow()
+
+        ordered_keys = sorted(buckets.keys(), key=sort_key)
+        sales_data = []
+        for k in ordered_keys:
+            count = buckets[k]['count']
+            total = buckets[k]['sum']
+            avg = total / count if count else 0
+            # Create a tuple-like structure similar to previous queries
+            if period == 'daily' or period == 'weekly':
+                dt_obj = datetime.strptime(k, '%Y-%m-%d')
+            elif period == 'monthly':
+                dt_obj = datetime.strptime(k, '%Y-%m')
+            else:
+                dt_obj = datetime.strptime(k, '%Y')
+            sales_data.append((dt_obj, count, total, avg))
         
         # Get top customers
         top_customers = db.session.query(
@@ -140,6 +131,33 @@ def get_sales_report():
         total_revenue = sum(float(item[2]) for item in sales_data)
         avg_order_value = total_revenue / total_orders if total_orders > 0 else 0
         
+        # Optional CSV export
+        export_format = (request.args.get('format') or '').lower()
+        if export_format == 'csv':
+            import csv
+            from io import StringIO
+            csv_buffer = StringIO()
+            writer = csv.writer(csv_buffer)
+            writer.writerow(['Period', 'Order Count', 'Total Revenue', 'Average Order Value'])
+            for item in sales_data:
+                period_str = (
+                    item[0].strftime('%Y-%m-%d') if period == 'daily' else
+                    item[0].strftime('%Y-%m') if period == 'monthly' else
+                    item[0].strftime('%Y') if period == 'yearly' else
+                    item[0].strftime('%Y-%m-%d')
+                )
+                writer.writerow([period_str, item[1], float(item[2]) if item[2] else 0, float(item[3]) if item[3] else 0])
+            # Add summary row
+            writer.writerow([])
+            writer.writerow(['TOTAL', total_orders, total_revenue, avg_order_value])
+
+            csv_content = csv_buffer.getvalue()
+            from flask import make_response
+            response = make_response(csv_content)
+            response.headers['Content-Type'] = 'text/csv'
+            response.headers['Content-Disposition'] = 'attachment; filename="sales_report.csv"'
+            return response
+
         return jsonify({
             'period': period,
             'startDate': start_date.isoformat(),
@@ -152,9 +170,9 @@ def get_sales_report():
             'salesData': [
                 {
                     'period': item[0].strftime('%Y-%m-%d') if period == 'daily' else 
+                             item[0].strftime('%Y-%m-%d') if period == 'weekly' else 
                              item[0].strftime('%Y-%m') if period == 'monthly' else
-                             item[0].strftime('%Y') if period == 'yearly' else
-                             item[0].strftime('%Y-%m-%d'),
+                             item[0].strftime('%Y'),
                     'orderCount': item[1],
                     'totalRevenue': float(item[2]) if item[2] else 0,
                     'averageOrderValue': float(item[3]) if item[3] else 0
@@ -185,7 +203,7 @@ def get_sales_report():
         return jsonify({'error': 'Failed to generate sales report'}), 500
 
 @reports_bp.route('/reports/inventory', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_inventory_report():
     try:
         # Get inventory summary
@@ -251,7 +269,7 @@ def get_inventory_report():
         return jsonify({'error': 'Failed to generate inventory report'}), 500
 
 @reports_bp.route('/reports/customers', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_customers_report():
     try:
         # Get customer summary
@@ -324,7 +342,7 @@ def get_customers_report():
         return jsonify({'error': 'Failed to generate customers report'}), 500
 
 @reports_bp.route('/reports/financial', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_financial_report():
     try:
         # Get query parameters

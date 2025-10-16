@@ -58,7 +58,7 @@
         <div class="quick-actions">
           <a class="btn light" href="add-order.html">Add New Order</a>
           <a class="btn light" href="invoices.html">Create Invoice</a>
-          <a class="btn light" href="inventory.html">Update Inventory</a>
+          <a class="btn light" href="add-stock.html">Update Inventory</a>
           <a class="btn light" href="deliveries.html">Record Delivery</a>
           <a class="btn light" href="deliveries.html">Cheak deliveries</a>
           <a class="btn light" href="reports.html">Cheak Reports</a>
@@ -113,10 +113,53 @@
       updateTopbarUI();
       attachLogoutHandler();
       
-      // Load dashboard data
+      // Load dashboard data (first, attempt to sync any local orders to DB)
       try {
-        const api = new TexSarthiAPI();
-        const stats = await api.getDashboardStats();
+        try {
+          const localRaw = localStorage.getItem('orders_list') || '[]';
+          const localOrders = JSON.parse(localRaw);
+          if (Array.isArray(localOrders) && localOrders.length > 0) {
+            // Minimal client to push orders if api.js is missing
+            const base = 'http://localhost:3000/api';
+            for (const loc of localOrders) {
+              try {
+                // Create/ensure customer
+                const customerPayload = {
+                  name: String(loc.customer || loc.customer_name || 'Customer').trim().slice(0,100),
+                  email: (loc.customer_email || '').trim() || undefined,
+                  phone: (loc.customer_phone || '').trim() || undefined,
+                  address: (loc.customer_address || '').trim() || undefined
+                };
+                let customerId;
+                try {
+                  const cRes = await fetch(`${base}/customers`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(customerPayload)});
+                  if (cRes.ok) { const cj = await cRes.json(); customerId = cj.id; }
+                } catch(_){ }
+                const orderPayload = {
+                  order_number: loc.order_number || undefined,
+                  customer_name: customerPayload.name,
+                  customer_id: customerId,
+                  order_type: loc.order_type || 'fabric',
+                  status: loc.status || 'pending',
+                  quantity: Number(loc.quantity || loc.qty || 1),
+                  order_value: Number(loc.order_value || loc.amount || 0),
+                  advance_payment: Number(loc.advance_payment || 0)
+                };
+                const oRes = await fetch(`${base}/orders`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(orderPayload)});
+                // ignore failures (it might already exist)
+              } catch(_) {}
+            }
+          }
+        } catch(_) {}
+
+        let stats;
+        if (window.api && window.api.getDashboardStats) {
+          stats = await window.api.getDashboardStats();
+        } else {
+          const res = await fetch('http://localhost:3000/api/dashboard/stats');
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          stats = await res.json();
+        }
         
         // Update dashboard cards
         document.getElementById('total-orders').textContent = stats.totalOrders || 0;

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TexSaarthi - Create Invoice</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="auth.js" defer></script>
+  <script src="api.js" defer></script>
+  <style>
+    .form-wrap { max-width: 720px; margin: 0 auto; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .muted { color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">TexSaarthi</div>
+    <nav>
+      <a href="index.html">Dashboard</a>
+      <a href="orders.html">Orders</a>
+      <a class="active" href="invoices.html">Invoices</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="deliveries.html">Deliveries</a>
+      <a href="customers.html">Customers</a>
+      <a href="reports.html">Reports</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <header class="topbar">
+      <h1>Create Invoice</h1>
+      <div>
+        <a class="btn secondary" href="invoices.html">Back to Invoices</a>
+      </div>
+    </header>
+
+    <div class="panel form-wrap">
+      <form id="invoice-form">
+        <div class="grid-2">
+          <div class="field">
+            <label>Order ID *</label>
+            <input id="order_id" type="number" placeholder="e.g., 1" required>
+            <div class="muted">Tip: You can get Order IDs from Orders page.</div>
+          </div>
+          <div class="field">
+            <label>Amount (before tax) *</label>
+            <input id="amount" type="number" min="0" step="0.01" placeholder="0.00" required>
+          </div>
+          <div class="field">
+            <label>Tax Rate</label>
+            <input id="tax_rate" type="number" min="0" step="0.01" value="0.18">
+            <div class="muted">e.g., 0.18 for 18%</div>
+          </div>
+          <div class="field">
+            <label>Due Date</label>
+            <input id="due_date" type="date">
+          </div>
+        </div>
+        <div class="field">
+          <label>Notes</label>
+          <textarea id="notes" rows="3" placeholder="Optional notes for this invoice..."></textarea>
+        </div>
+        <div class="form-actions">
+          <button class="btn light" type="reset">Reset</button>
+          <button class="btn primary" type="submit">Create Invoice</button>
+        </div>
+        <div id="msg" class="alert hidden"></div>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    function showMsg(text, ok){
+      const el = document.getElementById('msg');
+      el.textContent = text;
+      el.classList.remove('hidden');
+      el.style.background = ok ? '#e7f7ec' : '#fde8e8';
+      el.style.color = ok ? '#065f46' : '#7f1d1d';
+      el.style.borderColor = ok ? '#a7f3d0' : '#fecaca';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      updateTopbarUI();
+      attachLogoutHandler();
+      // If navigated with ?order_id=, prefill
+      const usp = new URLSearchParams(location.search);
+      const qId = usp.get('order_id');
+      if (qId) document.getElementById('order_id').value = qId;
+    });
+
+    document.getElementById('invoice-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const orderId = Number(document.getElementById('order_id').value);
+      const amount = Number(document.getElementById('amount').value);
+      const tax_rate = Number(document.getElementById('tax_rate').value || 0);
+      const due_date = document.getElementById('due_date').value || undefined;
+      const notes = document.getElementById('notes').value || '';
+      if (!orderId || amount < 0) { showMsg('Please provide valid Order ID and Amount', false); return; }
+      try {
+        const api = new TexSarthiAPI();
+        await api.request(`/orders/${orderId}/invoice`, {
+          method: 'POST',
+          body: JSON.stringify({ amount, tax_rate, due_date, notes })
+        });
+        showMsg('Invoice created successfully. Redirecting...', true);
+        setTimeout(() => location.href = 'invoices.html', 800);
+      } catch (err) {
+        showMsg('Failed to create invoice: ' + (err.message || err), false);
+      }
+    });
+  </script>
+</body>
+</html>
+
+

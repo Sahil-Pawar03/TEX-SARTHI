@@ -37,14 +37,15 @@
 
     <div class="panel">
       <div class="searchbar">
-        <input type="text" placeholder="Search orders by customer or order number...">
-        <select>
-          <option>All Status</option>
-          <option>in progress</option>
-          <option>ready</option>
-          <option>received</option>
+        <input id="order-search" type="text" placeholder="Search orders by customer, order #, type or fabric...">
+        <select id="order-status">
+          <option value="">All Status</option>
+          <option value="pending">pending</option>
+          <option value="in_progress">in progress</option>
+          <option value="completed">completed</option>
+          <option value="cancelled">cancelled</option>
         </select>
-        <button class="btn light">Filter</button>
+        <button id="order-filter" class="btn light">Filter</button>
       </div>
       <table>
         <thead>
@@ -65,50 +66,179 @@
     </div>
   </main>
   <script>
-    (function(){
-      var body = document.getElementById('orders-body');
-      if (!body) return;
-      var stored = [];
-      try { stored = JSON.parse(localStorage.getItem('orders_list') || '[]'); } catch(_) {}
-      if (!Array.isArray(stored) || stored.length === 0) return;
-      function statusClass(s){
-        var v = String(s || '').toLowerCase().trim();
-        if (v === 'ready' || v === 'completed') return 'green';
-        if (v === 'received') return 'blue';
-        if (v.indexOf('progress') !== -1) return 'yellow';
-        return 'red';
-      }
-      stored.forEach(function(o){
-        var tr = document.createElement('tr');
-        // Map exactly to the table columns (no Color/Units here)
-        var cells = [
-          o.orderNo || '',
-          o.customer || '',
-          o.type || '',
-          o.fabric || '',
-          o.qty || '',
-          o.delivery || '',
-          o.value || '',
-        ];
-        cells.forEach(function(text){
-          var td = document.createElement('td');
-          td.textContent = text;
-          tr.appendChild(td);
-        });
-        var statusTd = document.createElement('td');
-        var span = document.createElement('span');
-        span.className = 'status ' + statusClass(o.status);
-        span.textContent = (o.status || '').toString();
-        statusTd.appendChild(span);
-        tr.appendChild(statusTd);
+    // Render helpers
+    function statusClass(s){
+      var v = String(s || '').toLowerCase().trim();
+      if (v === 'completed') return 'green';
+      if (v.indexOf('progress') !== -1) return 'yellow';
+      if (v === 'pending') return 'red';
+      return 'blue';
+    }
 
-        var actions = document.createElement('td');
-        actions.className = 'actions';
-        actions.innerHTML = '<button class="btn elevated">View</button> <button class="btn elevated">Edit</button>';
-        tr.appendChild(actions);
-        body.appendChild(tr);
-      });
-    })();
+    function renderOrders(rows){
+      const body = document.getElementById('orders-body');
+      if (!body) return;
+      if (!rows || rows.length === 0){
+        body.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:16px; color:#666;">No orders found</td></tr>';
+        return;
+      }
+      body.innerHTML = rows.map(o => `
+        <tr>
+          <td>${o.order_number}</td>
+          <td>${o.customer_name || 'N/A'}</td>
+          <td>${o.order_type || ''}</td>
+          <td>${o.fabric || ''}</td>
+          <td>${o.quantity || 0}</td>
+          <td>${o.delivery_date || 'N/A'}</td>
+          <td>₹${Number(o.order_value||0).toLocaleString()}</td>
+          <td><span class="status ${statusClass(o.status)}">${o.status}</span></td>
+          <td class="actions">
+            <button class="btn elevated" onclick="editOrder(${o.id || 0}, '${(o.order_number||'').replace(/'/g, "&#39;")}')">Edit</button>
+          </td>
+        </tr>`).join('');
+    }
+
+    async function loadOrdersWithFilters(){
+      const search = document.getElementById('order-search').value.trim();
+      const status = document.getElementById('order-status').value;
+      let merged = [];
+      // 0) If backend is available, sync locally saved orders to the backend so dashboard shows real data
+      try {
+        if (window.api && window.api.getOrders && window.api.createOrder) {
+          // Load local orders
+          const localRaw = localStorage.getItem('orders_list') || '[]';
+          let local = [];
+          try { local = JSON.parse(localRaw); } catch(_) { local = []; }
+          if (Array.isArray(local) && local.length > 0) {
+            for (const loc of local) {
+              try {
+                // Ensure customer exists
+                const name = String(loc.customer || loc.customer_name || 'Customer');
+                let cid = null;
+                try {
+                  const cs = await window.api.getCustomers(name);
+                  const exact = (cs||[]).find(c => String(c.name||'').toLowerCase() === name.toLowerCase());
+                  if (exact) cid = exact.id;
+                } catch(_) {}
+                if (!cid) {
+                  const createdC = await window.api.createCustomer({ name });
+                  cid = createdC && createdC.customer && createdC.customer.id;
+                }
+                if (!cid) continue;
+                // Create order in backend (idempotent-ish; duplicates are acceptable for now)
+                await window.api.createOrder({
+                  customer_id: cid,
+                  customer_name: name,
+                  order_type: String(loc.type || loc.order_type || 'custom'),
+                  fabric: String(loc.fabric || ''),
+                  color: String(loc.color || ''),
+                  quantity: Number(loc.qty || loc.quantity || 1),
+                  order_value: Number((loc.value || loc.order_value || 0).toString().replace(/[^0-9.]/g,'')) || 0,
+                  delivery_date: (loc.delivery || loc.delivery_date || '') || null,
+                  status: String(loc.status || 'pending').toLowerCase().replace(' ', '_')
+                });
+              } catch(_) { /* ignore sync error for individual rows */ }
+            }
+          }
+        }
+      } catch(_) {}
+      // 1) Try backend first (if api.js loaded)
+      try {
+        if (window.api && window.api.getOrders) {
+          const apiOrders = await window.api.getOrders({ search, status });
+          if (Array.isArray(apiOrders)) merged = merged.concat(apiOrders);
+        }
+      } catch (e) {
+        console.warn('API orders unavailable, using local list if present');
+      }
+      // 2) Merge locally saved orders (from add-order.html style)
+      try {
+        const local = JSON.parse(localStorage.getItem('orders_list') || '[]');
+        if (Array.isArray(local)) {
+          const mapped = local.map(o => ({
+            id: o.id || Date.now(),
+            order_number: o.orderNo || o.order_number || '',
+            customer_name: o.customer || o.customer_name || '',
+            order_type: o.type || o.order_type || '',
+            fabric: o.fabric || '',
+            quantity: o.qty || o.quantity || 0,
+            delivery_date: o.delivery || o.delivery_date || '',
+            order_value: Number((o.value || o.order_value || 0).toString().replace(/[^0-9.]/g,'')) || 0,
+            status: (o.status || 'pending').toString().toLowerCase().replace(' ', '_')
+          }));
+          merged = mapped.concat(merged); // show local first
+        }
+      } catch(_) {}
+      // 3) Client-side filter
+      if (status) merged = merged.filter(o => String(o.status||'').toLowerCase() === status);
+      if (search) {
+        const s = search.toLowerCase();
+        merged = merged.filter(o =>
+          String(o.order_number||'').toLowerCase().includes(s) ||
+          String(o.customer_name||'').toLowerCase().includes(s) ||
+          String(o.order_type||'').toLowerCase().includes(s) ||
+          String(o.fabric||'').toLowerCase().includes(s)
+        );
+      }
+      renderOrders(merged);
+    }
+
+    // Override edit to work without backend for local orders
+    window.editOrder = async function(id, orderNumber){
+      try {
+        // Load local orders
+        const raw = localStorage.getItem('orders_list') || '[]';
+        let local = [];
+        try { local = JSON.parse(raw); } catch(_) { local = []; }
+        // Find by id or order number
+        let idx = -1;
+        for (let i = 0; i < local.length; i++) {
+          const o = local[i] || {};
+          if ((id && String(o.id) === String(id)) || (orderNumber && (o.orderNo === orderNumber || o.order_number === orderNumber))) { idx = i; break; }
+        }
+        if (idx === -1) {
+          alert('This order is from the server. Editing locally is not supported.');
+          return;
+        }
+        const cur = local[idx] || {};
+        const qty = prompt('Update quantity', String(cur.qty ?? cur.quantity ?? ''));
+        if (qty === null) return;
+        const status = prompt('Update status (pending, in_progress, completed, cancelled)', String((cur.status||'pending')).toLowerCase());
+        if (status === null) return;
+        // Persist minimal fields used by UI
+        if (!isNaN(Number(qty))) {
+          cur.qty = Number(qty);
+          cur.quantity = Number(qty); // keep both keys for renderer
+        }
+        cur.status = status;
+        // normalize order number key so renderer can find it
+        if (!cur.order_number && (cur.orderNo || orderNumber)) cur.order_number = cur.orderNo || orderNumber;
+        local[idx] = cur;
+        localStorage.setItem('orders_list', JSON.stringify(local));
+        // Refresh table
+        await loadOrdersWithFilters();
+        alert('Order updated locally.');
+      } catch (e) {
+        alert('Failed to update order: ' + (e.message || e));
+      }
+    };
+
+    // Wire events
+    document.addEventListener('DOMContentLoaded', function(){
+      const searchEl = document.getElementById('order-search');
+      const statusEl = document.getElementById('order-status');
+      const filterBtn = document.getElementById('order-filter');
+      // Initial load
+      loadOrdersWithFilters();
+      // Debounced search on typing
+      let t;
+      searchEl.addEventListener('input', function(){ clearTimeout(t); t = setTimeout(loadOrdersWithFilters, 300); });
+      searchEl.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); loadOrdersWithFilters(); } });
+      // Status change
+      statusEl.addEventListener('change', loadOrdersWithFilters);
+      // Button click
+      filterBtn.addEventListener('click', loadOrdersWithFilters);
+    });
   </script>
 </body>
 </html>

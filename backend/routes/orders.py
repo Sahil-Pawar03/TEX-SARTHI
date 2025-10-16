@@ -87,7 +87,7 @@ def create_order():
         data = request.get_json()
         
         if not data:
-            return jsonify({'error': 'No data provided'}), 400
+            data = {}
         
         # Validate required fields
         required_fields = ['customer_id', 'customer_name', 'order_type', 'order_value']
@@ -140,10 +140,8 @@ def update_order(order_id):
         if not order:
             return jsonify({'error': 'Order not found'}), 404
         
-        data = request.get_json()
-        
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
+        # Accept empty body; use sensible defaults derived from the order
+        data = request.get_json(silent=True) or {}
         
         # Update allowed fields
         if 'customer_id' in data:
@@ -271,7 +269,7 @@ def create_order_invoice(order_id):
             return jsonify({'error': 'No data provided'}), 400
         
         # Calculate invoice details
-        amount = float(data.get('amount', order.order_value - order.advance_payment))
+        amount = float(data.get('amount', (order.order_value or 0) - (order.advance_payment or 0)))
         tax_rate = float(data.get('tax_rate', 0.18))  # Default 18% GST
         tax_amount = amount * tax_rate
         total_amount = amount + tax_amount

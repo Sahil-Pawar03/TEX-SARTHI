@@ -57,14 +57,14 @@
 
     <div class="panel">
       <div class="searchbar">
-        <input type="text" placeholder="Search invoices by customer name or invoice number...">
-        <select>
-          <option>All Status</option>
-          <option>paid</option>
-          <option>unpaid</option>
-          <option>partial</option>
+        <input id="invoice-search" type="text" placeholder="Search invoices by customer name or invoice number...">
+        <select id="invoice-status">
+          <option value="">All Status</option>
+          <option value="paid">paid</option>
+          <option value="pending">unpaid</option>
+          <option value="partial">partial</option>
         </select>
-        <button class="btn">Filter</button>
+        <button id="invoice-filter" class="btn">Filter</button>
       </div>
       <table>
         <thead>
@@ -129,7 +129,36 @@
   </div>
 
   <script>
-    const api = new TexSarthiAPI();
+    // Fallback API if api.js fails to load
+    function createMinimalAPI(){
+      const BASE = 'http://localhost:3000/api';
+      async function req(endpoint, options={}){
+        const res = await fetch(BASE + endpoint, {
+          headers: { 'Content-Type': 'application/json' },
+          ...options
+        });
+        if (!res.ok) throw new Error(await res.text());
+        return await res.json();
+      }
+      return {
+        async getInvoices(filters={}){
+          const params = new URLSearchParams();
+          if (filters.status) params.append('status', filters.status);
+          if (filters.search) params.append('search', filters.search);
+          const j = await req(`/invoices${params.toString()?`?${params.toString()}`:''}`);
+          return (j && j.invoices) || [];
+        },
+        async getOrders(){
+          const j = await req('/orders');
+          return (j && j.orders) || [];
+        },
+        async request(path, options){
+          return await req(path, options);
+        },
+        async getAIInvoiceStats(){ return { stats: { total_ai_invoices: 0 } }; }
+      }
+    }
+    const api = (window.api) ? window.api : createMinimalAPI();
     let selectedOrders = [];
     let analysisData = [];
 
@@ -151,19 +180,25 @@
       attachLogoutHandler();
       
       await loadInvoices();
-      await checkAIAvailability();
       
       // Set up event listeners
-      document.getElementById('ai-generate-btn').addEventListener('click', openAIModal);
-      document.getElementById('proceed-analysis-btn').addEventListener('click', analyzeSelectedOrders);
-      document.getElementById('generate-invoices-btn').addEventListener('click', generateSelectedInvoices);
+      document.getElementById('create-invoice-btn').addEventListener('click', quickCreateInvoice);
+      document.getElementById('invoice-filter').addEventListener('click', loadInvoices);
+      document.getElementById('invoice-search').addEventListener('keydown', function(e){ if(e.key==='Enter'){ loadInvoices(); }});
+      // AI button kept disabled since backend AI endpoints are not available
+      const aiBtn = document.getElementById('ai-generate-btn');
+      if (aiBtn) { aiBtn.disabled = true; aiBtn.innerHTML = '<span>🚫</span> AI Unavailable'; }
     });
 
     // Load invoices data
     async function loadInvoices() {
       try {
-        const response = await api.getInvoices();
-        const invoices = response.invoices || [];
+        const filters = { };
+        const s = document.getElementById('invoice-search');
+        const st = document.getElementById('invoice-status');
+        if (s && s.value.trim()) filters.search = s.value.trim();
+        if (st && st.value) filters.status = st.value;
+        const invoices = await api.getInvoices(filters);
         
         // Update statistics
         const totalInvoices = invoices.length;
@@ -211,7 +246,7 @@
       tbody.innerHTML = invoices.map(invoice => `
         <tr>
           <td>${invoice.invoice_number}</td>
-          <td>Customer #${invoice.customer_id}</td>
+          <td>${invoice.customer_id ? ('Customer #' + invoice.customer_id) : (invoice.customer_name || 'N/A')}</td>
           <td>${formatDate(invoice.created_at)}</td>
           <td>${formatDate(invoice.due_date)}</td>
           <td>₹${invoice.total_amount.toLocaleString()}</td>
@@ -225,25 +260,84 @@
       `).join('');
     }
 
-    // Check AI availability
-    async function checkAIAvailability() {
+    // Quick create invoice flow (no AI)
+    async function quickCreateInvoice() {
       try {
-        const response = await api.checkAIAvailability();
-        if (!response.ai_available) {
-          document.getElementById('ai-generate-btn').disabled = true;
-          document.getElementById('ai-generate-btn').innerHTML = '<span>🚫</span> AI Unavailable';
+        const orders = await api.getOrders();
+        if (!orders || orders.length === 0) {
+          alert('No orders available.');
+          return;
         }
-      } catch (error) {
-        console.warn('Could not check AI availability:', error);
+        const idStr = prompt('Enter Order ID or Order Number (e.g., ID ' + orders[0].id + ' or ' + (orders[0].order_number||'ORD-XXXX') + '):');
+        if (idStr === null) return;
+        let orderId = Number(idStr);
+        if (!orderId) {
+          // Try resolve by exact order number from current page
+          const s = String(idStr).trim().toLowerCase();
+          let match = (orders||[]).find(o => String(o.order_number||'').toLowerCase() === s);
+          // If not found (pagination), query backend with search
+          if (!match) {
+            try {
+              const searched = await api.getOrders({ search: s });
+              if (Array.isArray(searched)) {
+                match = searched.find(o => String(o.order_number||'').toLowerCase() === s) || searched[0];
+              }
+            } catch(_) {}
+          }
+          if (match && match.id) orderId = Number(match.id);
+        }
+        // Fallback: if still not found, try from localStorage and push to backend
+        if (!orderId) {
+          try {
+            const s = String(idStr).trim().toLowerCase();
+            const local = JSON.parse(localStorage.getItem('orders_list') || '[]');
+            const loc = (Array.isArray(local)?local:[]).find(o => String(o.orderNo||o.order_number||'').toLowerCase() === s);
+            if (loc) {
+              // ensure customer exists
+              const custName = String(loc.customer||loc.customer_name||'Customer');
+              let cid = null;
+              try {
+                const cs = await api.getCustomers(custName);
+                const exact = (cs||[]).find(c => String(c.name||'').toLowerCase() === custName.toLowerCase());
+                if (exact) cid = exact.id;
+              } catch(_) {}
+              if (!cid) {
+                try { const created = await api.createCustomer({ name: custName }); cid = created && created.customer && created.customer.id; } catch(_) {}
+              }
+              if (cid) {
+                const createdOrder = await api.createOrder({
+                  customer_id: cid,
+                  customer_name: custName,
+                  order_type: String(loc.type||loc.order_type||'custom'),
+                  fabric: String(loc.fabric||''),
+                  color: String(loc.color||''),
+                  quantity: Number(loc.qty||loc.quantity||1),
+                  order_value: Number((loc.value||loc.order_value||0).toString().replace(/[^0-9.]/g,''))||0,
+                  delivery_date: (loc.delivery||loc.delivery_date||'') || null,
+                  status: String(loc.status||'pending').toLowerCase().replace(' ','_')
+                });
+                if (createdOrder && createdOrder.order && createdOrder.order.id) {
+                  orderId = Number(createdOrder.order.id);
+                }
+              }
+            }
+          } catch(_) {}
+        }
+        if (!orderId) { alert('Order not found in backend. Please create the order first or enter a valid ID/number.'); return; }
+        // Prefer new endpoint that accepts order_number only (more robust)
+        if (!orderId) {
+          await api.request('/invoices/by-order-number', { method: 'POST', body: JSON.stringify({ order_number: String(idStr).trim() }) });
+        } else {
+          await api.request(`/orders/${orderId}/invoice`, { method: 'POST', body: JSON.stringify({}) });
+        }
+        alert('Invoice created.');
+        await loadInvoices();
+      } catch (e) {
+        alert('Failed to create invoice: ' + (e.message || e));
       }
     }
 
-    // Open AI modal and load orders
-    async function openAIModal() {
-      document.getElementById('ai-modal').classList.remove('hidden');
-      await loadOrdersForAI();
-      showStep1();
-    }
+    // Disabled AI modal since backend AI endpoints are not available
 
     // Close AI modal
     function closeAIModal() {
