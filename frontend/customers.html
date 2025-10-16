@@ -28,7 +28,7 @@
       <h1>Customer Management</h1>
       <div>
         <span id="welcome-user" class="hidden" style="margin-right:8px;"></span>
-        <button class="btn primary">Add Customer</button>
+        <a class="btn primary" href="add-customer.html">Add Customer</a>
       </div>
     </header>
 
@@ -56,14 +56,14 @@
         <input type="text" placeholder="Search customers by name, phone, or email...">
         <button class="btn">Search</button>
       </div>
-      <div class="customer-cards">
+      <div class="customer-cards" id="customer-cards">
         <div class="customer-card">
           <h3>Rajesh Kumar</h3>
           <p>+91 9876543210 • rajesh@example.com</p>
           <p>123 Textile Street, Mumbai</p>
           <p><strong>Total Orders:</strong> 5 • <strong>Total Spent:</strong> ₹125,000</p>
           <p><strong>Outstanding:</strong> ₹25,000 • <strong>Last Order:</strong> 15/01/2024</p>
-          <button class="btn elevated">View Orders</button>
+          <button class="btn elevated" onclick="openOrdersModal(1)">View Orders</button>
         </div>
         <div class="customer-card">
           <h3>Priya Textiles</h3>
@@ -71,7 +71,7 @@
           <p>456 Market Road, Pune</p>
           <p><strong>Total Orders:</strong> 8 • <strong>Total Spent:</strong> ₹320,000</p>
           <p><strong>Outstanding:</strong> ₹0 • <strong>Last Order:</strong> 18/01/2024</p>
-          <button class="btn elevated">View Orders</button>
+          <button class="btn elevated" onclick="openOrdersModal(2)">View Orders</button>
         </div>
         <div class="customer-card">
           <h3>Mumbai Fabrics Ltd</h3>
@@ -79,11 +79,106 @@
           <p>789 Industrial Area, Mumbai</p>
           <p><strong>Total Orders:</strong> 12 • <strong>Total Spent:</strong> ₹850,000</p>
           <p><strong>Outstanding:</strong> ₹75,000 • <strong>Last Order:</strong> 20/01/2024</p>
-          <button class="btn elevated">View Orders</button>
+          <button class="btn elevated" onclick="openOrdersModal(3)">View Orders</button>
         </div>
       </div>
     </div>
   </main>
+  <!-- Simple Orders Modal -->
+  <div id="orders-modal" class="modal hidden">
+    <div class="modal-content" style="max-width:900px;">
+      <div class="modal-header">
+        <h2>Customer Orders</h2>
+        <button class="modal-close" onclick="closeOrdersModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="orders-loading" class="loading">Loading orders...</div>
+        <table id="orders-table" class="hidden" style="width:100%;">
+          <thead>
+            <tr>
+              <th>Order #</th>
+              <th>Type</th>
+              <th>Fabric</th>
+              <th>Qty</th>
+              <th>Delivery</th>
+              <th>Value</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div id="orders-empty" class="hidden" style="text-align:center; padding:16px; color:#666;">No orders found</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn secondary" onclick="closeOrdersModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Inject locally saved customers to the grid (no backend)
+    document.addEventListener('DOMContentLoaded', function(){
+      const container = document.getElementById('customer-cards');
+      if (!container) return;
+      let local = [];
+      try { local = JSON.parse(localStorage.getItem('local_customers') || '[]'); } catch(_) { local = []; }
+      if (!Array.isArray(local) || local.length === 0) return;
+      const makeCard = (c) => {
+        const div = document.createElement('div');
+        div.className = 'customer-card';
+        div.innerHTML = `
+          <h3>${c.name}</h3>
+          <p>${c.phone || ''} • ${c.email || ''}</p>
+          <p>${c.address || ''}${c.city ? ', ' + c.city : ''}</p>
+          <p><strong>Total Orders:</strong> ${c.total_orders || 0} • <strong>Total Spent:</strong> ₹${(c.total_spent||0).toLocaleString()}</p>
+          <p><strong>Outstanding:</strong> ₹${(c.outstanding_amount||0).toLocaleString()} • <strong>Last Order:</strong> ${c.last_order_date || 'N/A'}</p>
+          <button class="btn elevated" onclick="openOrdersModal(${c.id})">View Orders</button>
+        `;
+        return div;
+      };
+      local.forEach(c => container.prepend(makeCard(c)));
+    });
+    function show(el){ el.classList.remove('hidden'); }
+    function hide(el){ el.classList.add('hidden'); }
+    
+    async function openOrdersModal(customerId){
+      const modal = document.getElementById('orders-modal');
+      const loading = document.getElementById('orders-loading');
+      const table = document.getElementById('orders-table');
+      const tbody = table.querySelector('tbody');
+      const empty = document.getElementById('orders-empty');
+      
+      show(modal); show(loading); hide(table); hide(empty);
+      tbody.innerHTML = '';
+      
+      try {
+        const api = new TexSarthiAPI();
+        const res = await api.request(`/customers/${customerId}/orders`);
+        const orders = res && res.orders ? res.orders : [];
+        if (orders.length === 0){ hide(loading); show(empty); return; }
+        
+        orders.forEach(o => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${o.order_number}</td>
+            <td>${o.order_type}</td>
+            <td>${o.fabric || ''}</td>
+            <td>${o.quantity}</td>
+            <td>${o.delivery_date || ''}</td>
+            <td>₹${(o.order_value||0).toLocaleString()}</td>
+            <td><span class="status ${getStatusClass(o.status)}">${o.status}</span></td>
+          `;
+          tbody.appendChild(tr);
+        });
+        hide(loading); show(table);
+      } catch(err){
+        hide(loading);
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:16px; color:#c00;">Failed to load orders: ${err.message || err}</td></tr>`;
+        show(table);
+      }
+    }
+    function closeOrdersModal(){ document.getElementById('orders-modal').classList.add('hidden'); }
+  </script>
 </body>
 </html>
 

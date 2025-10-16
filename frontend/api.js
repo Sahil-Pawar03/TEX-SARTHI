@@ -62,8 +62,14 @@ class TexSarthiAPI {
       }
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }));
-        throw new Error(error.error || `Request failed with status ${response.status}`);
+        // Try to extract useful error details (works for 4xx/5xx like 422)
+        const raw = await response.text().catch(() => '');
+        let parsed;
+        try { parsed = raw ? JSON.parse(raw) : null; } catch (_) { parsed = null; }
+        const serverMsg = (parsed && (parsed.error || parsed.message)) || raw || '';
+        console.error('API error', { url, status: response.status, statusText: response.statusText, serverMsg, parsed });
+        const msg = serverMsg ? `${response.status} ${response.statusText}: ${serverMsg}` : `HTTP ${response.status} ${response.statusText}`;
+        throw new Error(msg);
       }
 
       return await response.json();
@@ -192,7 +198,8 @@ class TexSarthiAPI {
     if (filters.search) params.append('search', filters.search);
     
     const queryString = params.toString();
-    return await this.request(`/invoices${queryString ? `?${queryString}` : ''}`);
+    const res = await this.request(`/invoices${queryString ? `?${queryString}` : ''}`);
+    return res && res.invoices ? res.invoices : [];
   }
 
   async createInvoice(invoiceData) {
@@ -435,33 +442,49 @@ document.addEventListener('DOMContentLoaded', async function() {
   // Load inventory if on inventory page
   if (window.location.pathname.includes('inventory.html')) {
     try {
-      const inventory = await window.api.getInventory();
+      const backendInventory = await window.api.getInventory();
+      // merge with local inventory (no-backend items)
+      let localInventory = [];
+      try { localInventory = JSON.parse(localStorage.getItem('local_inventory') || '[]'); } catch(_) { localInventory = []; }
+      const inventory = [...(Array.isArray(localInventory) ? localInventory : []), ...(Array.isArray(backendInventory) ? backendInventory : [])];
       const tbody = document.querySelector('#inventory-table tbody');
       
-      if (tbody && inventory.length > 0) {
-        tbody.innerHTML = '';
-        
-        inventory.forEach(item => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${item.item_name}</td>
-            <td>${item.type}</td>
-            <td>${item.color || 'N/A'}</td>
-            <td>${item.current_stock}</td>
-            <td>${item.min_stock}</td>
-            <td>₹${item.cost_per_unit}</td>
-            <td>₹${item.total_value.toLocaleString()}</td>
-            <td>${item.supplier || 'N/A'}</td>
-            <td><span class="status ${getStatusClass(item.status)}">${item.status}</span></td>
-            <td>
-              <button class="btn elevated" onclick="viewInventoryItem(${item.id})">View</button>
-            </td>
-          `;
-          tbody.appendChild(tr);
-        });
+      if (!tbody) return;
+      if (!Array.isArray(inventory)) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:16px; color:#666;">Failed to load inventory</td></tr>';
+        return;
       }
+
+      if (inventory.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:16px; color:#666;">No inventory items found</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+      inventory.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.item_name}</td>
+          <td>${item.type}</td>
+          <td>${item.color || 'N/A'}</td>
+          <td>${item.current_stock}${item.unit ? ' ' + item.unit : ''}</td>
+          <td>${item.min_stock}${item.unit ? ' ' + item.unit : ''}</td>
+          <td>₹${Number(item.cost_per_unit).toLocaleString()}</td>
+          <td>₹${(item.total_value || (item.current_stock * item.cost_per_unit)).toLocaleString()}</td>
+          <td>${item.supplier || 'N/A'}</td>
+          <td><span class="status ${getStatusClass(item.status)}">${String(item.status||'').replace('_',' ')}</span></td>
+          <td>
+            <button class="btn elevated" onclick="viewInventoryItem(${item.id})">View</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
     } catch (error) {
       console.error('Failed to load inventory:', error);
+      const tbody = document.querySelector('#inventory-table tbody');
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:16px; color:#666;">Unable to load inventory. Please check backend connection.</td></tr>';
+      }
     }
   }
 });
@@ -507,8 +530,26 @@ window.editOrder = function(id) {
 };
 
 window.viewCustomerOrders = function(id) {
-  console.log('View customer orders:', id);
-  // Implement view customer orders functionality
+  // If customers.html provided a modal helper, use it
+  if (typeof window.openOrdersModal === 'function') {
+    window.openOrdersModal(id);
+    return;
+  }
+  // Fallback: fetch and alert basic info
+  (async () => {
+    try {
+      const res = await window.api.request(`/customers/${id}/orders`);
+      const orders = (res && res.orders) || [];
+      if (orders.length === 0) {
+        alert('No orders found for this customer.');
+        return;
+      }
+      const list = orders.map(o => `#${o.order_number} • ${o.order_type} • Qty ${o.quantity} • ₹${o.order_value}`).join('\n');
+      alert(`Orders for customer ${id}:\n\n${list}`);
+    } catch (err) {
+      alert(`Failed to load orders: ${err.message || err}`);
+    }
+  })();
 };
 
 window.viewInventoryItem = function(id) {

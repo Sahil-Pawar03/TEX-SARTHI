@@ -27,7 +27,7 @@
     <header class="topbar">
       <h1>Settings & Configuration</h1>
       <div>
-        <button class="btn success">Save Changes</button>
+        <button id="save-settings" class="btn success">Save Changes</button>
         <a id="logout-btn" class="btn danger" href="#">Logout</a>
       </div>
     </header>
@@ -37,27 +37,63 @@
       <div class="grid-2">
         <div>
           <label>Business Name</label>
-          <input type="text" placeholder="TexSaarthi">
+          <input id="company_name" type="text" placeholder="TexSaarthi">
         </div>
         <div>
           <label>Owner Name</label>
-          <input type="text" placeholder="Owner">
+          <input id="owner_name" type="text" placeholder="Owner">
         </div>
         <div style="grid-column: 1 / -1;">
           <label>Business Address</label>
-          <input type="text" placeholder="Address">
+          <input id="company_address" type="text" placeholder="Address">
         </div>
         <div>
           <label>Phone Number</label>
-          <input type="text" placeholder="+91 0000000000">
+          <input id="company_phone" type="text" placeholder="+91 0000000000">
         </div>
         <div>
           <label>Email Address</label>
-          <input type="text" placeholder="email@example.com">
+          <input id="company_email" type="text" placeholder="email@example.com">
         </div>
       </div>
     </div>
   </main>
+  <script>
+    // Load existing settings from backend
+    document.addEventListener('DOMContentLoaded', async function(){
+      updateTopbarUI();
+      attachLogoutHandler();
+      try {
+        const api = new TexSarthiAPI();
+        const res = await api.getSettings();
+        const settings = res.settings || res || {};
+        const set = (id, key) => { const el = document.getElementById(id); if (el && settings[key]) el.value = settings[key]; };
+        set('company_name', 'company_name');
+        set('company_address', 'company_address');
+        set('company_phone', 'company_phone');
+        set('company_email', 'company_email');
+      } catch (e) {
+        console.warn('Failed to load settings', e);
+      }
+    });
+
+    // Save settings to backend
+    document.getElementById('save-settings').addEventListener('click', async function(){
+      const payload = {
+        company_name: document.getElementById('company_name').value.trim(),
+        company_address: document.getElementById('company_address').value.trim(),
+        company_phone: document.getElementById('company_phone').value.trim(),
+        company_email: document.getElementById('company_email').value.trim()
+      };
+      try {
+        const api = new TexSarthiAPI();
+        await api.updateSettings(payload);
+        alert('Settings saved');
+      } catch (e) {
+        alert('Failed to save settings: ' + (e.message || e));
+      }
+    });
+  </script>
 </body>
 </html>
 

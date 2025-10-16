@@ -268,11 +268,35 @@ table {
 }
 th, td {
   text-align: left;
-  padding: 10px;
+  padding: 12px 14px;
   border-bottom: 1px solid #eee;
   font-size: 14px;
+  vertical-align: middle;
 }
-th { background: #fafafa; }
+th {
+  background: #fafafa;
+  white-space: nowrap; /* keep headers on one line */
+}
+td {
+  white-space: normal; /* allow cell content to wrap */
+  overflow-wrap: anywhere; /* break long words/strings to avoid overflow */
+}
+
+/* Column width guidance for inventory table */
+#inventory-table th:nth-child(4),
+#inventory-table td:nth-child(4),
+#inventory-table th:nth-child(5),
+#inventory-table td:nth-child(5),
+#inventory-table th:nth-child(6),
+#inventory-table td:nth-child(6),
+#inventory-table th:nth-child(7),
+#inventory-table td:nth-child(7),
+#inventory-table th:nth-child(10),
+#inventory-table td:nth-child(10) { text-align: right; }
+
+/* Zebra striping for readability */
+#inventory-table tbody tr:nth-child(odd) { background: #fcfcff; }
+#inventory-table tbody tr:hover { background: #f7f7ff; }
 
 .status {
   padding: 4px 8px;

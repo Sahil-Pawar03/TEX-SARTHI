@@ -6,7 +6,7 @@ from sqlalchemy import func
 customers_bp = Blueprint('customers', __name__)
 
 @customers_bp.route('/customers', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_customers():
     try:
         # Get query parameters
@@ -54,7 +54,7 @@ def get_customers():
         return jsonify({'error': 'Failed to fetch customers'}), 500
 
 @customers_bp.route('/customers/<int:customer_id>', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_customer(customer_id):
     try:
         customer = Customer.query.get(customer_id)
@@ -191,7 +191,7 @@ def delete_customer(customer_id):
         return jsonify({'error': 'Failed to delete customer'}), 500
 
 @customers_bp.route('/customers/<int:customer_id>/orders', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_customer_orders(customer_id):
     try:
         customer = Customer.query.get(customer_id)
@@ -237,7 +237,7 @@ def get_customer_orders(customer_id):
         return jsonify({'error': 'Failed to fetch customer orders'}), 500
 
 @customers_bp.route('/customers/<int:customer_id>/stats', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_customer_stats(customer_id):
     try:
         customer = Customer.query.get(customer_id)
@@ -292,7 +292,7 @@ def get_customer_stats(customer_id):
         return jsonify({'error': 'Failed to fetch customer stats'}), 500
 
 @customers_bp.route('/customers/search', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def search_customers():
     try:
         search_term = request.args.get('q', '').strip()

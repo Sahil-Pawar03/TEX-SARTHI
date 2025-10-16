@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TexSaarthi - Add Stock</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="auth.js" defer></script>
+  <script src="api.js" defer></script>
+  <style>
+    .form-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    .form-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    
+    .form-section h3 {
+      margin-top: 0;
+      margin-bottom: 16px;
+      color: var(--primary);
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 8px;
+    }
+    
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+    
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    
+    .form-group label {
+      font-weight: 600;
+      color: var(--text);
+      font-size: 14px;
+    }
+    
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+    
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+    }
+    
+    .form-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      margin-top: 24px;
+    }
+    
+    .textile-specific {
+      background: linear-gradient(135deg, #f8f9ff 0%, #e8f2ff 100%);
+      border: 1px solid #c7d2fe;
+    }
+    
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+    
+    .alert.success {
+      background: #d1fae5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+    }
+    
+    .alert.error {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fca5a5;
+    }
+    
+    .alert.hidden {
+      display: none;
+    }
+    
+    .stock-calculator {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+    
+    .stock-calculator h4 {
+      margin: 0 0 12px 0;
+      color: #0369a1;
+    }
+    
+    .calculation-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    
+    .calculation-row.total {
+      font-weight: 600;
+      border-top: 1px solid #bae6fd;
+      padding-top: 8px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">TexSaarthi</div>
+    <nav>
+      <a href="index.html">Dashboard</a>
+      <a href="orders.html">Orders</a>
+      <a href="invoices.html">Invoices</a>
+      <a class="active" href="inventory.html">Inventory</a>
+      <a href="deliveries.html">Deliveries</a>
+      <a href="customers.html">Customers</a>
+      <a href="reports.html">Reports</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <header class="topbar">
+      <h1>Add Stock</h1>
+      <div>
+        <span id="welcome-user" class="hidden" style="margin-right:8px;"></span>
+        <a href="inventory.html" class="btn secondary">Back to Inventory</a>
+        <button id="logout-btn" class="btn secondary hidden" style="margin-left:8px;">Logout</button>
+      </div>
+    </header>
+
+    <div class="form-container">
+      <div id="alert-container"></div>
+      
+      <form id="add-stock-form">
+        <!-- Basic Information -->
+        <div class="form-section">
+          <h3>📦 Basic Information</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="item-name">Item Name *</label>
+              <input type="text" id="item-name" name="item_name" placeholder="e.g., Cotton Fabric, Silk Thread" required>
+            </div>
+            
+            <div class="form-group">
+              <label for="item-type">Type *</label>
+              <select id="item-type" name="type" required>
+                <option value="">Select Type</option>
+                <option value="fabric">Fabric</option>
+                <option value="thread">Thread</option>
+                <option value="button">Button</option>
+                <option value="zipper">Zipper</option>
+                <option value="accessory">Accessory</option>
+                <option value="raw_material">Raw Material</option>
+                <option value="dye">Dye</option>
+                <option value="chemical">Chemical</option>
+                <option value="equipment">Equipment</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="color">Color</label>
+              <input type="text" id="color" name="color" placeholder="e.g., White, Blue, Red">
+            </div>
+            
+            <div class="form-group">
+              <label for="supplier">Supplier *</label>
+              <input type="text" id="supplier" name="supplier" placeholder="e.g., Gujarat Cotton Mills" required>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stock Information -->
+        <div class="form-section">
+          <h3>📊 Stock Information</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="current-stock">Current Stock *</label>
+              <input type="number" id="current-stock" name="current_stock" min="0" step="0.01" placeholder="0" required>
+            </div>
+            
+            <div class="form-group">
+              <label for="min-stock">Minimum Stock Level *</label>
+              <input type="number" id="min-stock" name="min_stock" min="0" step="0.01" placeholder="0" required>
+            </div>
+            
+            <div class="form-group">
+              <label for="cost-per-unit">Cost per Unit (₹) *</label>
+              <input type="number" id="cost-per-unit" name="cost_per_unit" min="0" step="0.01" placeholder="0.00" required>
+            </div>
+            
+            <div class="form-group">
+              <label for="unit">Unit of Measurement</label>
+              <select id="unit" name="unit">
+                <option value="meters">Meters</option>
+                <option value="kg">Kilograms</option>
+                <option value="pieces">Pieces</option>
+                <option value="rolls">Rolls</option>
+                <option value="yards">Yards</option>
+                <option value="grams">Grams</option>
+                <option value="liters">Liters</option>
+                <option value="dozen">Dozen</option>
+              </select>
+            </div>
+          </div>
+          
+          <!-- Stock Calculator -->
+          <div class="stock-calculator">
+            <h4>💰 Total Value Calculator</h4>
+            <div class="calculation-row">
+              <span>Current Stock:</span>
+              <span id="calc-stock">0</span>
+            </div>
+            <div class="calculation-row">
+              <span>Cost per Unit:</span>
+              <span id="calc-cost">₹0.00</span>
+            </div>
+            <div class="calculation-row total">
+              <span>Total Value:</span>
+              <span id="calc-total">₹0.00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Textile-Specific Information -->
+        <div class="form-section textile-specific">
+          <h3>🧵 Textile-Specific Details</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="fabric-weight">Fabric Weight (GSM)</label>
+              <input type="number" id="fabric-weight" name="fabric_weight" min="0" placeholder="e.g., 150">
+            </div>
+            
+            <div class="form-group">
+              <label for="fabric-width">Fabric Width (inches)</label>
+              <input type="number" id="fabric-width" name="fabric_width" min="0" step="0.1" placeholder="e.g., 44">
+            </div>
+            
+            <div class="form-group">
+              <label for="thread-count">Thread Count</label>
+              <input type="text" id="thread-count" name="thread_count" placeholder="e.g., 40/2">
+            </div>
+            
+            <div class="form-group">
+              <label for="quality-grade">Quality Grade</label>
+              <select id="quality-grade" name="quality_grade">
+                <option value="">Select Grade</option>
+                <option value="A+">A+ (Premium)</option>
+                <option value="A">A (High)</option>
+                <option value="B">B (Medium)</option>
+                <option value="C">C (Standard)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Additional Information -->
+        <div class="form-section">
+          <h3>📝 Additional Information</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="batch-number">Batch/Lot Number</label>
+              <input type="text" id="batch-number" name="batch_number" placeholder="e.g., BATCH-2024-001">
+            </div>
+            
+            <div class="form-group">
+              <label for="expiry-date">Expiry Date</label>
+              <input type="date" id="expiry-date" name="expiry_date">
+            </div>
+            
+            <div class="form-group">
+              <label for="storage-location">Storage Location</label>
+              <input type="text" id="storage-location" name="storage_location" placeholder="e.g., Warehouse A, Rack 3">
+            </div>
+            
+            <div class="form-group">
+              <label for="status">Status</label>
+              <select id="status" name="status">
+                <option value="in_stock">In Stock</option>
+                <option value="low_stock">Low Stock</option>
+                <option value="out_of_stock">Out of Stock</option>
+                <option value="damaged">Damaged</option>
+                <option value="expired">Expired</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="notes">Notes</label>
+            <textarea id="notes" name="notes" rows="3" placeholder="Additional notes about this inventory item..."></textarea>
+          </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions">
+          <button type="button" class="btn secondary" onclick="resetForm()">Reset Form</button>
+          <button type="button" class="btn light" onclick="saveAsDraft()">Save as Draft</button>
+          <button type="submit" class="btn primary">Add Stock Item</button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    // Initialize the page
+    document.addEventListener('DOMContentLoaded', function() {
+      updateTopbarUI();
+      attachLogoutHandler();
+      
+      // Set up form event listeners
+      setupFormListeners();
+    });
+
+    function setupFormListeners() {
+      const form = document.getElementById('add-stock-form');
+      const stockInput = document.getElementById('current-stock');
+      const costInput = document.getElementById('cost-per-unit');
+      
+      // Real-time calculation
+      stockInput.addEventListener('input', updateTotalValue);
+      costInput.addEventListener('input', updateTotalValue);
+      
+      // Form submission
+      form.addEventListener('submit', handleFormSubmit);
+    }
+
+    function updateTotalValue() {
+      const stock = parseFloat(document.getElementById('current-stock').value) || 0;
+      const cost = parseFloat(document.getElementById('cost-per-unit').value) || 0;
+      const total = stock * cost;
+      
+      document.getElementById('calc-stock').textContent = stock.toLocaleString();
+      document.getElementById('calc-cost').textContent = `₹${cost.toLocaleString()}`;
+      document.getElementById('calc-total').textContent = `₹${total.toLocaleString()}`;
+    }
+
+    async function handleFormSubmit(e) {
+      e.preventDefault();
+      
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData.entries());
+      // Coerce empty strings to undefined for optional fields
+      Object.keys(data).forEach(k => { if (data[k] === '') delete data[k]; });
+      
+      // Convert numeric fields
+      data.current_stock = parseFloat(data.current_stock);
+      data.min_stock = parseFloat(data.min_stock);
+      data.cost_per_unit = parseFloat(data.cost_per_unit);
+      
+      if (data.fabric_weight) data.fabric_weight = parseFloat(data.fabric_weight);
+      if (data.fabric_width) data.fabric_width = parseFloat(data.fabric_width);
+      
+      try {
+        showAlert('Adding stock item...', 'success');
+        // Save locally (no-backend path or optimistic update)
+        try {
+          const localItem = {
+            id: Date.now(),
+            item_name: data.item_name,
+            type: data.type,
+            color: data.color || '',
+            current_stock: Number(data.current_stock || 0),
+            min_stock: Number(data.min_stock || 0),
+            cost_per_unit: Number(data.cost_per_unit || 0),
+            unit: data.unit || '',
+            supplier: data.supplier || '',
+            status: data.status || (Number(data.current_stock || 0) <= 0 ? 'out_of_stock' : (Number(data.current_stock||0) <= Number(data.min_stock||0) ? 'low_stock' : 'in_stock')),
+            total_value: Number(data.current_stock || 0) * Number(data.cost_per_unit || 0)
+          };
+          const existing = JSON.parse(localStorage.getItem('local_inventory') || '[]');
+          existing.unshift(localItem);
+          localStorage.setItem('local_inventory', JSON.stringify(existing));
+        } catch (_) {}
+
+        // Try backend (best-effort)
+        try { await window.api.createInventoryItem(data); } catch (_) {}
+        window.location.href = 'inventory.html';
+      } catch (error) {
+        console.error('Failed to add stock:', error);
+        // Attempt to parse backend error body if embedded in message
+        showAlert(`Failed to add stock: ${error.message || error}`, 'error');
+      }
+    }
+
+    function resetForm() {
+      document.getElementById('add-stock-form').reset();
+      updateTotalValue();
+      hideAlert();
+    }
+
+    function saveAsDraft() {
+      // Save form data to localStorage as draft
+      const formData = new FormData(document.getElementById('add-stock-form'));
+      const data = Object.fromEntries(formData.entries());
+      
+      localStorage.setItem('stock_draft', JSON.stringify(data));
+      showAlert('Form saved as draft!', 'success');
+    }
+
+    function loadDraft() {
+      const draft = localStorage.getItem('stock_draft');
+      if (draft) {
+        const data = JSON.parse(draft);
+        
+        // Populate form fields
+        Object.keys(data).forEach(key => {
+          const element = document.querySelector(`[name="${key}"]`);
+          if (element) {
+            element.value = data[key];
+          }
+        });
+        
+        updateTotalValue();
+        showAlert('Draft loaded successfully!', 'success');
+      }
+    }
+
+    function showAlert(message, type) {
+      const container = document.getElementById('alert-container');
+      container.innerHTML = `<div class="alert ${type}">${message}</div>`;
+      
+      if (type === 'success') {
+        setTimeout(() => hideAlert(), 5000);
+      }
+    }
+
+    function hideAlert() {
+      const container = document.getElementById('alert-container');
+      container.innerHTML = '';
+    }
+
+    // Load draft on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      loadDraft();
+    });
+  </script>
+</body>
+</html>

@@ -6,7 +6,7 @@ from sqlalchemy import func
 inventory_bp = Blueprint('inventory', __name__)
 
 @inventory_bp.route('/inventory', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_inventory():
     try:
         # Get query parameters
@@ -65,7 +65,7 @@ def get_inventory():
         return jsonify({'error': 'Failed to fetch inventory'}), 500
 
 @inventory_bp.route('/inventory/<int:item_id>', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_inventory_item(item_id):
     try:
         item = InventoryItem.query.get(item_id)
@@ -82,7 +82,7 @@ def get_inventory_item(item_id):
         return jsonify({'error': 'Failed to fetch inventory item'}), 500
 
 @inventory_bp.route('/inventory', methods=['POST'])
-@jwt_required()
+@jwt_required(optional=True)
 def create_inventory_item():
     try:
         data = request.get_json()
@@ -123,7 +123,7 @@ def create_inventory_item():
         return jsonify({'error': 'Failed to create inventory item'}), 500
 
 @inventory_bp.route('/inventory/<int:item_id>', methods=['PUT'])
-@jwt_required()
+@jwt_required(optional=True)
 def update_inventory_item(item_id):
     try:
         item = InventoryItem.query.get(item_id)
@@ -175,7 +175,7 @@ def update_inventory_item(item_id):
         return jsonify({'error': 'Failed to update inventory item'}), 500
 
 @inventory_bp.route('/inventory/<int:item_id>', methods=['DELETE'])
-@jwt_required()
+@jwt_required(optional=True)
 def delete_inventory_item(item_id):
     try:
         item = InventoryItem.query.get(item_id)
@@ -193,7 +193,7 @@ def delete_inventory_item(item_id):
         return jsonify({'error': 'Failed to delete inventory item'}), 500
 
 @inventory_bp.route('/inventory/<int:item_id>/stock', methods=['PUT'])
-@jwt_required()
+@jwt_required(optional=True)
 def update_stock(item_id):
     try:
         item = InventoryItem.query.get(item_id)
@@ -240,7 +240,7 @@ def update_stock(item_id):
         return jsonify({'error': 'Failed to update stock'}), 500
 
 @inventory_bp.route('/inventory/stats', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_inventory_stats():
     try:
         # Get total items count
@@ -306,7 +306,7 @@ def get_inventory_stats():
         return jsonify({'error': 'Failed to fetch inventory stats'}), 500
 
 @inventory_bp.route('/inventory/types', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_inventory_types():
     try:
         # Get unique inventory types

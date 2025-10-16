@@ -18,11 +18,12 @@ def generate_invoice_number():
     return f"INV-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
 
 @invoices_bp.route('/invoices', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_invoices():
     try:
         # Get query parameters
         status = request.args.get('status')
+        customer_id = request.args.get('customer_id', type=int)
         search = request.args.get('search')
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 20, type=int)
@@ -32,6 +33,8 @@ def get_invoices():
         
         if status:
             query = query.filter(Invoice.status == status)
+        if customer_id:
+            query = query.filter(Invoice.customer_id == customer_id)
         
         if search:
             search_term = f"%{search}%"
@@ -69,7 +72,7 @@ def get_invoices():
         return jsonify({'error': 'Failed to fetch invoices'}), 500
 
 @invoices_bp.route('/invoices/<int:invoice_id>', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_invoice(invoice_id):
     try:
         invoice = Invoice.query.get(invoice_id)

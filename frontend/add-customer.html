@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TexSaarthi - Add Customer</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="auth.js" defer></script>
+  <style>
+    .form { max-width: 720px; margin: 0 auto; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+    .form .field { display: flex; flex-direction: column; gap: 6px; }
+    .form input, .form textarea { padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
+    .form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">TexSaarthi</div>
+    <nav>
+      <a href="index.html">Dashboard</a>
+      <a href="orders.html">Orders</a>
+      <a href="invoices.html">Invoices</a>
+      <a href="inventory.html">Inventory</a>
+      <a class="active" href="customers.html">Customers</a>
+      <a href="reports.html">Reports</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <header class="topbar">
+      <h1>Add Customer</h1>
+      <div>
+        <a class="btn secondary" href="customers.html">Back to Customers</a>
+      </div>
+    </header>
+
+    <div class="panel form">
+      <form id="customer-form">
+        <div class="grid-2">
+          <div class="field">
+            <label>Name *</label>
+            <input id="name" type="text" required placeholder="Customer name">
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <input id="email" type="email" placeholder="you@example.com">
+          </div>
+          <div class="field">
+            <label>Phone</label>
+            <input id="phone" type="text" placeholder="+91 0000000000">
+          </div>
+          <div class="field">
+            <label>City</label>
+            <input id="city" type="text" placeholder="City">
+          </div>
+          <div class="field" style="grid-column: 1 / -1;">
+            <label>Address</label>
+            <input id="address" type="text" placeholder="Street, Area, State">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn light" type="reset">Reset</button>
+          <button class="btn primary" type="submit">Save Customer</button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    function getLocalCustomers(){
+      try { return JSON.parse(localStorage.getItem('local_customers') || '[]'); } catch(_) { return []; }
+    }
+    function setLocalCustomers(list){ localStorage.setItem('local_customers', JSON.stringify(list || [])); }
+
+    document.getElementById('customer-form').addEventListener('submit', function(e){
+      e.preventDefault();
+      const customer = {
+        id: Date.now(),
+        name: document.getElementById('name').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        address: document.getElementById('address').value.trim(),
+        city: document.getElementById('city').value.trim(),
+        created_at: new Date().toISOString(),
+        total_orders: 0,
+        total_spent: 0,
+        outstanding_amount: 0,
+        last_order_date: null
+      };
+      if (!customer.name){ alert('Please enter name'); return; }
+      const list = getLocalCustomers();
+      list.unshift(customer);
+      setLocalCustomers(list);
+      alert('Customer saved locally.');
+      window.location.href = 'customers.html';
+    });
+  </script>
+</body>
+</html>
+
+
