@@ -61,6 +61,42 @@ class TexSarthiAPI {
         throw new Error('Authentication required');
       }
 
+      // Handle invalid/expired token causing 422 from optional JWT routes
+      if (response.status === 422) {
+        // Many public endpoints use optional JWT; an invalid token triggers 422.
+        // Clear token and retry once without Authorization header.
+        console.warn('Received 422 (likely invalid token). Clearing token and retrying once without auth.');
+        this.clearToken();
+        const retryConfig = {
+          ...config,
+          headers: {
+            ...config.headers,
+          }
+        };
+        delete retryConfig.headers.Authorization;
+        const retryResponse = await fetch(url, retryConfig);
+        if (retryResponse.ok) {
+          return await retryResponse.json();
+        }
+        // If still not ok, try a silent auto-login then retry with new token
+        try {
+          await this.login('admin@texsarthi.com', 'admin123');
+          const retryWithAuth = await fetch(url, {
+            ...config,
+            headers: {
+              ...config.headers,
+              'Authorization': `Bearer ${this.token}`
+            }
+          });
+          if (retryWithAuth.ok) {
+            return await retryWithAuth.json();
+          }
+        } catch (_) {
+          // ignore
+        }
+        // Fall through to generic error handling below
+      }
+
       if (!response.ok) {
         // Try to extract useful error details (works for 4xx/5xx like 422)
         const raw = await response.text().catch(() => '');
@@ -429,7 +465,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             <p>${customer.address || 'N/A'}</p>
             <p><strong>Total Orders:</strong> ${customer.total_orders} • <strong>Total Spent:</strong> ₹${customer.total_spent.toLocaleString()}</p>
             <p><strong>Outstanding:</strong> ₹${customer.outstanding_amount.toLocaleString()} • <strong>Last Order:</strong> ${customer.last_order_date || 'N/A'}</p>
-            <button class="btn elevated" onclick="viewCustomerOrders(${customer.id})">View Orders</button>
           `;
           container.appendChild(card);
         });

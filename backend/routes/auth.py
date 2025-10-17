@@ -3,6 +3,8 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 from models import User, db
 from werkzeug.security import generate_password_hash, check_password_hash
 import re
+import json
+from urllib.parse import parse_qs
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -20,7 +22,23 @@ def validate_password(password):
 @auth_bp.route('/login', methods=['POST'])
 def login():
     try:
-        data = request.get_json()
+        # Accept JSON, form-encoded, or raw bodies
+        data = request.get_json(silent=True)
+        if not data and request.form:
+            data = request.form.to_dict()
+        if not data:
+            raw = request.get_data(cache=False, as_text=True) or ''
+            if raw:
+                # Try JSON first
+                try:
+                    data = json.loads(raw)
+                except Exception:
+                    # Try form-encoded parsing
+                    try:
+                        parsed = parse_qs(raw)
+                        data = {k: (v[0] if isinstance(v, list) and v else v) for k, v in parsed.items()}
+                    except Exception:
+                        data = None
         
         if not data:
             return jsonify({'error': 'No data provided'}), 400
@@ -40,8 +58,8 @@ def login():
         if not user or not user.check_password(password):
             return jsonify({'error': 'Invalid email or password'}), 401
         
-        # Create access token
-        access_token = create_access_token(identity=user.id)
+        # Create access token (ensure identity is a string for compatibility)
+        access_token = create_access_token(identity=str(user.id))
         
         return jsonify({
             'token': access_token,
@@ -50,12 +68,27 @@ def login():
         }), 200
         
     except Exception as e:
-        return jsonify({'error': 'Login failed'}), 500
+        # Provide more context during debugging
+        return jsonify({'error': 'Login failed', 'details': str(e)}), 500
 
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
     try:
-        data = request.get_json()
+        # Accept JSON, form-encoded, or raw bodies
+        data = request.get_json(silent=True)
+        if not data and request.form:
+            data = request.form.to_dict()
+        if not data:
+            raw = request.get_data(cache=False, as_text=True) or ''
+            if raw:
+                try:
+                    data = json.loads(raw)
+                except Exception:
+                    try:
+                        parsed = parse_qs(raw)
+                        data = {k: (v[0] if isinstance(v, list) and v else v) for k, v in parsed.items()}
+                    except Exception:
+                        data = None
         
         if not data:
             return jsonify({'error': 'No data provided'}), 400
@@ -90,8 +123,8 @@ def signup():
         db.session.add(user)
         db.session.commit()
         
-        # Create access token
-        access_token = create_access_token(identity=user.id)
+        # Create access token (ensure identity is a string for compatibility)
+        access_token = create_access_token(identity=str(user.id))
         
         return jsonify({
             'token': access_token,

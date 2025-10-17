@@ -63,7 +63,6 @@
           <p>123 Textile Street, Mumbai</p>
           <p><strong>Total Orders:</strong> 5 • <strong>Total Spent:</strong> ₹125,000</p>
           <p><strong>Outstanding:</strong> ₹25,000 • <strong>Last Order:</strong> 15/01/2024</p>
-          
         </div>
         <div class="customer-card">
           <h3>Priya Textiles</h3>
@@ -71,7 +70,6 @@
           <p>456 Market Road, Pune</p>
           <p><strong>Total Orders:</strong> 8 • <strong>Total Spent:</strong> ₹320,000</p>
           <p><strong>Outstanding:</strong> ₹0 • <strong>Last Order:</strong> 18/01/2024</p>
-          
         </div>
         <div class="customer-card">
           <h3>Mumbai Fabrics Ltd</h3>
@@ -79,7 +77,6 @@
           <p>789 Industrial Area, Mumbai</p>
           <p><strong>Total Orders:</strong> 12 • <strong>Total Spent:</strong> ₹850,000</p>
           <p><strong>Outstanding:</strong> ₹75,000 • <strong>Last Order:</strong> 20/01/2024</p>
-          
         </div>
       </div>
     </div>
@@ -132,7 +129,6 @@
           <p>${c.address || ''}${c.city ? ', ' + c.city : ''}</p>
           <p><strong>Total Orders:</strong> ${c.total_orders || 0} • <strong>Total Spent:</strong> ₹${(c.total_spent||0).toLocaleString()}</p>
           <p><strong>Outstanding:</strong> ₹${(c.outstanding_amount||0).toLocaleString()} • <strong>Last Order:</strong> ${c.last_order_date || 'N/A'}</p>
-          
         `;
         return div;
       };
