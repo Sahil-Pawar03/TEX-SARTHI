@@ -67,10 +67,10 @@
   </main>
   <script>
     // Render helpers
-    function statusClass(s){
-      var v = String(s || '').toLowerCase().trim();
+      function statusClass(s){
+        var v = String(s || '').toLowerCase().trim();
       if (v === 'completed') return 'green';
-      if (v.indexOf('progress') !== -1) return 'yellow';
+        if (v.indexOf('progress') !== -1) return 'yellow';
       if (v === 'pending') return 'red';
       return 'blue';
     }

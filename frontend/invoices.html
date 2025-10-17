@@ -29,9 +29,6 @@
       <div>
         <span id="welcome-user" class="hidden" style="margin-right:8px;"></span>
         <button class="btn success" id="create-invoice-btn">Create Invoice</button>
-        <button class="btn primary" id="ai-generate-btn" style="margin-left:8px;">
-          <span id="ai-icon">🤖</span> AI Generate
-        </button>
         <button id="logout-btn" class="btn secondary hidden" style="margin-left:8px;">Logout</button>
       </div>
     </header>
@@ -185,9 +182,14 @@
       document.getElementById('create-invoice-btn').addEventListener('click', quickCreateInvoice);
       document.getElementById('invoice-filter').addEventListener('click', loadInvoices);
       document.getElementById('invoice-search').addEventListener('keydown', function(e){ if(e.key==='Enter'){ loadInvoices(); }});
-      // AI button kept disabled since backend AI endpoints are not available
-      const aiBtn = document.getElementById('ai-generate-btn');
-      if (aiBtn) { aiBtn.disabled = true; aiBtn.innerHTML = '<span>🚫</span> AI Unavailable'; }
+      document.getElementById('invoice-search').addEventListener('input', function(e){ 
+        // Real-time search as you type (with a small delay to avoid too many requests)
+        clearTimeout(window.searchTimeout);
+        window.searchTimeout = setTimeout(() => {
+          loadInvoices();
+        }, 500);
+      });
+      document.getElementById('invoice-status').addEventListener('change', loadInvoices);
     });
 
     // Load invoices data
@@ -254,7 +256,7 @@
           <td><span class="status ${getStatusClass(invoice.status)}">${invoice.status}</span></td>
           <td>
             <button class="btn elevated" onclick="viewInvoice(${invoice.id})">View</button>
-            <button class="btn elevated">Download</button>
+            <button class="btn elevated" onclick="downloadInvoice(${invoice.id})">Download</button>
           </td>
         </tr>
       `).join('');
@@ -263,77 +265,161 @@
     // Quick create invoice flow (no AI)
     async function quickCreateInvoice() {
       try {
+        // Get orders from backend
         const orders = await api.getOrders();
         if (!orders || orders.length === 0) {
-          alert('No orders available.');
+          alert('No orders available. Please create an order first.');
           return;
         }
-        const idStr = prompt('Enter Order ID or Order Number (e.g., ID ' + orders[0].id + ' or ' + (orders[0].order_number||'ORD-XXXX') + '):');
+        
+        // Show available orders to user
+        const orderList = orders.map(o => `ID: ${o.id} - ${o.order_number} (${o.customer_name})`).join('\n');
+        const idStr = prompt(`Available Orders:\n${orderList}\n\nEnter Order ID (e.g., 1, 2, 3):`);
         if (idStr === null) return;
-        let orderId = Number(idStr);
-        if (!orderId) {
-          // Try resolve by exact order number from current page
-          const s = String(idStr).trim().toLowerCase();
-          let match = (orders||[]).find(o => String(o.order_number||'').toLowerCase() === s);
-          // If not found (pagination), query backend with search
-          if (!match) {
-            try {
-              const searched = await api.getOrders({ search: s });
-              if (Array.isArray(searched)) {
-                match = searched.find(o => String(o.order_number||'').toLowerCase() === s) || searched[0];
-              }
-            } catch(_) {}
-          }
-          if (match && match.id) orderId = Number(match.id);
+        
+        const orderId = Number(idStr);
+        if (!orderId || isNaN(orderId)) {
+          alert('Please enter a valid Order ID (number).');
+          return;
         }
-        // Fallback: if still not found, try from localStorage and push to backend
-        if (!orderId) {
-          try {
-            const s = String(idStr).trim().toLowerCase();
-            const local = JSON.parse(localStorage.getItem('orders_list') || '[]');
-            const loc = (Array.isArray(local)?local:[]).find(o => String(o.orderNo||o.order_number||'').toLowerCase() === s);
-            if (loc) {
-              // ensure customer exists
-              const custName = String(loc.customer||loc.customer_name||'Customer');
-              let cid = null;
-              try {
-                const cs = await api.getCustomers(custName);
-                const exact = (cs||[]).find(c => String(c.name||'').toLowerCase() === custName.toLowerCase());
-                if (exact) cid = exact.id;
-              } catch(_) {}
-              if (!cid) {
-                try { const created = await api.createCustomer({ name: custName }); cid = created && created.customer && created.customer.id; } catch(_) {}
-              }
-              if (cid) {
-                const createdOrder = await api.createOrder({
-                  customer_id: cid,
-                  customer_name: custName,
-                  order_type: String(loc.type||loc.order_type||'custom'),
-                  fabric: String(loc.fabric||''),
-                  color: String(loc.color||''),
-                  quantity: Number(loc.qty||loc.quantity||1),
-                  order_value: Number((loc.value||loc.order_value||0).toString().replace(/[^0-9.]/g,''))||0,
-                  delivery_date: (loc.delivery||loc.delivery_date||'') || null,
-                  status: String(loc.status||'pending').toLowerCase().replace(' ','_')
-                });
-                if (createdOrder && createdOrder.order && createdOrder.order.id) {
-                  orderId = Number(createdOrder.order.id);
-                }
-              }
-            }
-          } catch(_) {}
+        
+        // Verify order exists
+        const order = orders.find(o => o.id === orderId);
+        if (!order) {
+          alert(`Order with ID ${orderId} not found. Please try again.`);
+          return;
         }
-        if (!orderId) { alert('Order not found in backend. Please create the order first or enter a valid ID/number.'); return; }
-        // Prefer new endpoint that accepts order_number only (more robust)
-        if (!orderId) {
-          await api.request('/invoices/by-order-number', { method: 'POST', body: JSON.stringify({ order_number: String(idStr).trim() }) });
-        } else {
-          await api.request(`/orders/${orderId}/invoice`, { method: 'POST', body: JSON.stringify({}) });
-        }
-        alert('Invoice created.');
+        
+        // Create invoice using the order ID
+        const response = await api.request(`/orders/${orderId}/invoice`, { 
+          method: 'POST', 
+          body: JSON.stringify({}) 
+        });
+        
+        alert(`Invoice created successfully!\nInvoice Number: ${response.invoice.invoice_number}\nAmount: ₹${response.invoice.total_amount}`);
         await loadInvoices();
       } catch (e) {
+        console.error('Invoice creation error:', e);
         alert('Failed to create invoice: ' + (e.message || e));
+      }
+    }
+
+    // View invoice details
+    async function viewInvoice(invoiceId) {
+      try {
+        const response = await api.request(`/invoices/${invoiceId}/view`, { method: 'GET' });
+        const invoice = response.invoice;
+        
+        // Create modal content
+        const modalContent = `
+          <div class="modal-overlay" onclick="closeInvoiceModal()">
+            <div class="modal-content" onclick="event.stopPropagation()">
+              <div class="modal-header">
+                <h2>Invoice Details</h2>
+                <button class="close-btn" onclick="closeInvoiceModal()">&times;</button>
+              </div>
+              <div class="modal-body">
+                <div class="invoice-details">
+                  <div class="detail-section">
+                    <h3>Invoice Information</h3>
+                    <p><strong>Invoice Number:</strong> ${invoice.invoice_number}</p>
+                    <p><strong>Invoice Date:</strong> ${formatDate(invoice.created_at)}</p>
+                    <p><strong>Due Date:</strong> ${formatDate(invoice.due_date)}</p>
+                    <p><strong>Status:</strong> <span class="status ${getStatusClass(invoice.status)}">${invoice.status}</span></p>
+                  </div>
+                  
+                  ${invoice.customer ? `
+                  <div class="detail-section">
+                    <h3>Customer Information</h3>
+                    <p><strong>Name:</strong> ${invoice.customer.name}</p>
+                    <p><strong>Phone:</strong> ${invoice.customer.phone || 'N/A'}</p>
+                    <p><strong>Email:</strong> ${invoice.customer.email || 'N/A'}</p>
+                    <p><strong>Address:</strong> ${invoice.customer.address || 'N/A'}</p>
+                  </div>
+                  ` : ''}
+                  
+                  ${invoice.order ? `
+                  <div class="detail-section">
+                    <h3>Order Information</h3>
+                    <p><strong>Order Number:</strong> ${invoice.order.order_number}</p>
+                    <p><strong>Order Date:</strong> ${formatDate(invoice.order.created_at)}</p>
+                    <p><strong>Item Type:</strong> ${invoice.order.order_type || 'N/A'}</p>
+                    <p><strong>Fabric:</strong> ${invoice.order.fabric || 'N/A'}</p>
+                    <p><strong>Color:</strong> ${invoice.order.color || 'N/A'}</p>
+                    <p><strong>Quantity:</strong> ${invoice.order.quantity}</p>
+                    <p><strong>Notes:</strong> ${invoice.order.notes || 'N/A'}</p>
+                  </div>
+                  ` : ''}
+                  
+                  <div class="detail-section">
+                    <h3>Amount Details</h3>
+                    <p><strong>Subtotal:</strong> ₹${invoice.amount.toLocaleString()}</p>
+                    <p><strong>Tax (18%):</strong> ₹${invoice.tax_amount.toLocaleString()}</p>
+                    <p><strong>Total Amount:</strong> ₹${invoice.total_amount.toLocaleString()}</p>
+                  </div>
+                  
+                  ${invoice.notes ? `
+                  <div class="detail-section">
+                    <h3>Notes</h3>
+                    <p>${invoice.notes}</p>
+                  </div>
+                  ` : ''}
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button class="btn elevated" onclick="downloadInvoice(${invoiceId})">Download PDF</button>
+                <button class="btn" onclick="closeInvoiceModal()">Close</button>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalContent);
+        
+      } catch (error) {
+        console.error('Failed to load invoice details:', error);
+        alert('Failed to load invoice details: ' + (error.message || error));
+      }
+    }
+
+    // Download invoice as PDF
+    async function downloadInvoice(invoiceId) {
+      try {
+        const response = await fetch(`http://localhost:3000/api/invoices/${invoiceId}/download`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to download invoice');
+        }
+        
+        // Get filename from response headers
+        const contentDisposition = response.headers.get('Content-Disposition');
+        const filename = contentDisposition 
+          ? contentDisposition.split('filename=')[1] 
+          : `invoice_${invoiceId}.pdf`;
+        
+        // Create blob and download
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+      } catch (error) {
+        console.error('Failed to download invoice:', error);
+        alert('Failed to download invoice: ' + (error.message || error));
+      }
+    }
+
+    // Close invoice modal
+    function closeInvoiceModal() {
+      const modal = document.querySelector('.modal-overlay');
+      if (modal) {
+        modal.remove();
       }
     }
 
@@ -511,9 +597,7 @@
       return statusMap[status] || 'gray';
     }
 
-    function viewInvoice(invoiceId) {
-      alert(`View invoice #${invoiceId} - Full invoice viewer not implemented yet`);
-    }
+    // This function is now implemented above
   </script>
 
   <!-- Add modal styles -->
@@ -542,6 +626,84 @@
       max-width: 800px;
       max-height: 80%;
       overflow-y: auto;
+    }
+
+    /* Invoice details modal styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      color: #333;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #666;
+    }
+
+    .close-btn:hover {
+      color: #333;
+    }
+
+    .modal-body {
+      padding: 20px;
+    }
+
+    .invoice-details {
+      display: grid;
+      gap: 20px;
+    }
+
+    .detail-section {
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 8px;
+      border-left: 4px solid #007bff;
+    }
+
+    .detail-section h3 {
+      margin: 0 0 10px 0;
+      color: #333;
+      font-size: 16px;
+    }
+
+    .detail-section p {
+      margin: 5px 0;
+      color: #666;
+    }
+
+    .detail-section strong {
+      color: #333;
+    }
+
+    .modal-footer {
+      padding: 20px;
+      border-top: 1px solid #eee;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
     }
     
     .modal-header {

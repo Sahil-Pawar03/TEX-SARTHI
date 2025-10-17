@@ -263,10 +263,8 @@ def create_order_invoice(order_id):
         if not order:
             return jsonify({'error': 'Order not found'}), 404
         
-        data = request.get_json()
-        
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
+        # Accept empty body; use sensible defaults derived from the order
+        data = request.get_json(silent=True) or {}
         
         # Calculate invoice details
         amount = float(data.get('amount', (order.order_value or 0) - (order.advance_payment or 0)))

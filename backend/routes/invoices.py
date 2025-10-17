@@ -1,9 +1,15 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file, make_response
 from flask_jwt_extended import jwt_required
 from models import Invoice, Order, Customer, db
 from sqlalchemy import or_, and_
 from datetime import datetime, date
 import uuid
+import io
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
 
 # Import AI invoice generator for integration
 try:
@@ -374,3 +380,338 @@ def get_invoice_stats():
         
     except Exception as e:
         return jsonify({'error': 'Failed to fetch invoice stats'}), 500
+
+@invoices_bp.route('/invoices/<int:invoice_id>/view', methods=['GET'])
+@jwt_required(optional=True)
+def view_invoice(invoice_id):
+    """Get detailed invoice information for viewing"""
+    try:
+        invoice = Invoice.query.get(invoice_id)
+        
+        if not invoice:
+            return jsonify({'error': 'Invoice not found'}), 404
+        
+        # Get related order and customer details
+        order = Order.query.get(invoice.order_id)
+        customer = Customer.query.get(invoice.customer_id)
+        
+        invoice_data = invoice.to_dict()
+        invoice_data['order'] = order.to_dict() if order else None
+        invoice_data['customer'] = customer.to_dict() if customer else None
+        
+        return jsonify({
+            'invoice': invoice_data,
+            'message': 'Invoice details retrieved successfully'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': 'Failed to fetch invoice details'}), 500
+
+@invoices_bp.route('/invoices/<int:invoice_id>/download', methods=['GET'])
+@jwt_required(optional=True)
+def download_invoice_pdf(invoice_id):
+    """Download invoice as PDF"""
+    try:
+        invoice = Invoice.query.get(invoice_id)
+        
+        if not invoice:
+            return jsonify({'error': 'Invoice not found'}), 404
+        
+        # Get related order and customer details
+        order = Order.query.get(invoice.order_id)
+        customer = Customer.query.get(invoice.customer_id)
+        
+        # Create PDF
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*inch, bottomMargin=1*inch)
+        styles = getSampleStyleSheet()
+        story = []
+        
+        # Company Header with prominent TEX-SARTHI branding
+        header_style = ParagraphStyle(
+            'CompanyHeader',
+            parent=styles['Heading1'],
+            fontSize=36,
+            spaceAfter=15,
+            alignment=1,  # Center alignment
+            textColor=colors.darkblue,
+            fontName='Helvetica-Bold'
+        )
+        
+        company_style = ParagraphStyle(
+            'CompanyInfo',
+            parent=styles['Normal'],
+            fontSize=14,
+            spaceAfter=8,
+            alignment=1,
+            textColor=colors.darkgrey,
+            fontName='Helvetica'
+        )
+        
+        tagline_style = ParagraphStyle(
+            'CompanyTagline',
+            parent=styles['Normal'],
+            fontSize=12,
+            spaceAfter=5,
+            alignment=1,
+            textColor=colors.darkblue,
+            fontName='Helvetica-Bold'
+        )
+        
+        # Add a decorative line above the company name
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("─" * 50, ParagraphStyle('Line', fontSize=8, alignment=1, textColor=colors.darkblue)))
+        story.append(Spacer(1, 5))
+        
+        # Prominent TEX-SARTHI branding
+        story.append(Paragraph("TEX-SARTHI", header_style))
+        story.append(Paragraph("Textile & Garment Solutions", company_style))
+        story.append(Paragraph("Professional Tailoring Services", tagline_style))
+        story.append(Paragraph("Quality Tailoring • Custom Fitting • Professional Service", company_style))
+        
+        # Add a decorative line below the company info
+        story.append(Paragraph("─" * 50, ParagraphStyle('Line', fontSize=8, alignment=1, textColor=colors.darkblue)))
+        story.append(Spacer(1, 20))
+        
+        # Invoice Title
+        invoice_title_style = ParagraphStyle(
+            'InvoiceTitle',
+            parent=styles['Heading1'],
+            fontSize=20,
+            spaceAfter=20,
+            alignment=1,
+            textColor=colors.black,
+            fontName='Helvetica-Bold'
+        )
+        story.append(Paragraph("INVOICE", invoice_title_style))
+        
+        # Invoice and Bill To sections side by side
+        invoice_info = [
+            ['Invoice Number:', invoice.invoice_number],
+            ['Invoice Date:', invoice.created_at.strftime('%B %d, %Y')],
+            ['Due Date:', invoice.due_date.strftime('%B %d, %Y') if invoice.due_date else 'N/A'],
+            ['Status:', invoice.status.upper()]
+        ]
+        
+        if order:
+            invoice_info.extend([
+                ['Order Number:', order.order_number],
+                ['Order Date:', order.created_at.strftime('%B %d, %Y')],
+                ['Delivery Date:', order.delivery_date.strftime('%B %d, %Y') if order.delivery_date else 'N/A']
+            ])
+        
+        # Customer information
+        customer_info = []
+        if customer:
+            customer_info = [
+                ['Bill To:', ''],
+                ['Name:', customer.name],
+                ['Phone:', customer.phone or 'N/A'],
+                ['Email:', customer.email or 'N/A'],
+                ['Address:', customer.address or 'N/A']
+            ]
+        
+        # Create two-column layout
+        invoice_table = Table(invoice_info, colWidths=[1.5*inch, 2.5*inch])
+        invoice_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.darkblue),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.white),
+            ('TEXTCOLOR', (1, 0), (1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP')
+        ]))
+        
+        customer_table = Table(customer_info, colWidths=[1.5*inch, 2.5*inch]) if customer_info else None
+        if customer_table:
+            customer_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, 0), colors.darkgreen),
+                ('BACKGROUND', (0, 1), (0, -1), colors.lightgrey),
+                ('TEXTCOLOR', (0, 0), (0, 0), colors.white),
+                ('TEXTCOLOR', (1, 0), (1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (0, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP')
+            ]))
+        
+        # Add tables side by side
+        if customer_table:
+            combined_table = Table([[invoice_table, customer_table]], colWidths=[4*inch, 4*inch])
+            combined_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP')
+            ]))
+            story.append(combined_table)
+        else:
+            story.append(invoice_table)
+        
+        story.append(Spacer(1, 30))
+        
+        # Order details with professional styling
+        if order:
+            section_style = ParagraphStyle(
+                'SectionHeader',
+                parent=styles['Heading2'],
+                fontSize=14,
+                spaceAfter=10,
+                textColor=colors.darkblue,
+                fontName='Helvetica-Bold'
+            )
+            story.append(Paragraph("Order Details", section_style))
+            
+            order_data = [
+                ['Item Type:', order.order_type or 'N/A'],
+                ['Fabric:', order.fabric or 'N/A'],
+                ['Color:', order.color or 'N/A'],
+                ['Quantity:', str(order.quantity)],
+                ['Order Value:', f"₹{order.order_value:,.2f}"],
+                ['Advance Paid:', f"₹{order.advance_payment or 0:,.2f}"],
+                ['Notes:', order.notes or 'N/A']
+            ]
+            
+            order_table = Table(order_data, colWidths=[1.5*inch, 4*inch])
+            order_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.lightblue),
+                ('TEXTCOLOR', (0, 0), (0, -1), colors.white),
+                ('TEXTCOLOR', (1, 0), (1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP')
+            ]))
+            
+            story.append(order_table)
+            story.append(Spacer(1, 30))
+        
+        # Professional amount details section
+        story.append(Paragraph("Amount Details", section_style))
+        
+        # Create a more professional amount table
+        amount_data = [
+            ['Description', 'Amount'],
+            ['Subtotal', f"₹{invoice.amount:,.2f}"],
+            ['GST (18%)', f"₹{invoice.tax_amount:,.2f}"],
+            ['', ''],  # Empty row for spacing
+            ['TOTAL AMOUNT', f"₹{invoice.total_amount:,.2f}"]
+        ]
+        
+        amount_table = Table(amount_data, colWidths=[3*inch, 2*inch])
+        amount_table.setStyle(TableStyle([
+            # Header row
+            ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('TOPPADDING', (0, 0), (-1, 0), 12),
+            
+            # Data rows
+            ('BACKGROUND', (0, 1), (0, -2), colors.lightgrey),
+            ('TEXTCOLOR', (0, 1), (-1, -2), colors.black),
+            ('FONTNAME', (0, 1), (-1, -2), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -2), 11),
+            ('ALIGN', (0, 1), (0, -2), 'LEFT'),
+            ('ALIGN', (1, 1), (1, -2), 'RIGHT'),
+            ('BOTTOMPADDING', (0, 1), (-1, -2), 8),
+            ('TOPPADDING', (0, 1), (-1, -2), 8),
+            
+            # Total row
+            ('BACKGROUND', (0, -1), (-1, -1), colors.darkgreen),
+            ('TEXTCOLOR', (0, -1), (-1, -1), colors.white),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, -1), (-1, -1), 14),
+            ('ALIGN', (0, -1), (-1, -1), 'CENTER'),
+            ('BOTTOMPADDING', (0, -1), (-1, -1), 15),
+            ('TOPPADDING', (0, -1), (-1, -1), 15),
+            
+            # Grid
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+        ]))
+        
+        story.append(amount_table)
+        story.append(Spacer(1, 30))
+        
+        # Notes section
+        if invoice.notes:
+            story.append(Paragraph("Additional Notes", section_style))
+            notes_style = ParagraphStyle(
+                'Notes',
+                parent=styles['Normal'],
+                fontSize=10,
+                spaceAfter=10,
+                textColor=colors.darkgrey,
+                fontName='Helvetica',
+                leftIndent=20,
+                rightIndent=20,
+                borderWidth=1,
+                borderColor=colors.lightgrey,
+                borderPadding=10,
+                backColor=colors.lightgrey
+            )
+            story.append(Paragraph(invoice.notes, notes_style))
+            story.append(Spacer(1, 20))
+        
+        # Professional footer
+        footer_style = ParagraphStyle(
+            'Footer',
+            parent=styles['Normal'],
+            fontSize=9,
+            spaceAfter=10,
+            textColor=colors.darkgrey,
+            fontName='Helvetica',
+            alignment=1  # Center alignment
+        )
+        
+        story.append(Spacer(1, 40))
+        
+        # Add decorative line before footer
+        story.append(Paragraph("─" * 50, ParagraphStyle('Line', fontSize=8, alignment=1, textColor=colors.darkblue)))
+        story.append(Spacer(1, 10))
+        
+        # Professional footer with TEX-SARTHI branding
+        story.append(Paragraph("Thank you for choosing TEX-SARTHI!", footer_style))
+        story.append(Paragraph("TEX-SARTHI - Professional Tailoring Services", footer_style))
+        story.append(Paragraph("Quality Tailoring • Custom Fitting • Professional Service", footer_style))
+        story.append(Paragraph("For any queries, please contact us", footer_style))
+        
+        # Add TEX-SARTHI branding at the bottom
+        footer_brand_style = ParagraphStyle(
+            'FooterBrand',
+            parent=styles['Normal'],
+            fontSize=11,
+            spaceAfter=5,
+            textColor=colors.darkblue,
+            fontName='Helvetica-Bold',
+            alignment=1
+        )
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("TEX-SARTHI", footer_brand_style))
+        
+        # Build PDF
+        doc.build(story)
+        buffer.seek(0)
+        
+        # Create response
+        response = make_response(buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=invoice_{invoice.invoice_number}.pdf'
+        
+        return response
+        
+    except Exception as e:
+        return jsonify({'error': 'Failed to generate PDF'}), 500
+
